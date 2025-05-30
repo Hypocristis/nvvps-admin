@@ -47,6 +47,12 @@ import { User, Settings, LogOut, Undo2, Shield, CreditCard, Key } from "lucide-r
 import { useUser, SignOutButton, RedirectToSignIn } from "@clerk/nextjs"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -327,6 +333,49 @@ export default function FinancialDashboard() {
   const [currentPdfUrl, setCurrentPdfUrl] = useState("")
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState<string | null>(null)
 
+  // Add function to check and update overdue invoices
+  const updateOverdueInvoices = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset time part for accurate date comparison
+
+    setInvoices(currentInvoices =>
+      currentInvoices.map(invoice => {
+        const dueDate = new Date(invoice.dueDate)
+        dueDate.setHours(0, 0, 0, 0)
+
+        // If due date has passed and invoice is not paid, mark as overdue
+        if (dueDate < today && invoice.status !== "Zapłacona") {
+          if (invoice.status !== "Przeterminowana") {
+            // Only add to history if status is actually changing
+            addToHistory(
+              "Edytowano",
+              "Faktura",
+              invoice.id,
+              `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
+              { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
+              user,
+            )
+          }
+          return { ...invoice, status: "Przeterminowana" }
+        }
+        return invoice
+      })
+    )
+  }
+
+  // Add useEffect to check for overdue invoices
+  useEffect(() => {
+    updateOverdueInvoices()
+    // Set up an interval to check daily
+    const intervalId = setInterval(updateOverdueInvoices, 24 * 60 * 60 * 1000)
+    return () => clearInterval(intervalId)
+  }, []) // Empty dependency array means this runs once when component mounts
+
+  // Also update overdue check when invoices are modified
+  useEffect(() => {
+    updateOverdueInvoices()
+  }, [invoices.length]) // Run when number of invoices changes
+
   // Simulate loading
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1500)
@@ -517,7 +566,38 @@ export default function FinancialDashboard() {
     setIsPdfModalOpen(true)
   }
 
-  // Handler functions
+  // Add this function before handleAddInvoice
+  const validateInvoiceFormat = (invoiceId: string): { isValid: boolean; error?: string } => {
+    // Split the invoice number into parts
+    const parts = invoiceId.split('/')
+    if (parts.length !== 3) {
+      return { isValid: false, error: 'Format faktury musi być: numer/miesiąc/rok' }
+    }
+
+    const [number, month, year] = parts
+
+    // Validate number (must be positive integer)
+    const invoiceNumber = parseInt(number)
+    if (isNaN(invoiceNumber) || invoiceNumber <= 0 || number !== invoiceNumber.toString()) {
+      return { isValid: false, error: 'Numer faktury musi być dodatnią liczbą całkowitą' }
+    }
+
+    // Validate month (must be 01-12)
+    const monthNumber = parseInt(month)
+    if (isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12 || month !== monthNumber.toString().padStart(2, '0')) {
+      return { isValid: false, error: 'Miesiąc musi być w formacie 01-12' }
+    }
+
+    // Validate year (must be a valid year, not in the future)
+    const yearNumber = parseInt(year)
+    const currentYear = new Date().getFullYear()
+    if (isNaN(yearNumber) || yearNumber < 2000 || yearNumber > currentYear) {
+      return { isValid: false, error: `Rok musi być pomiędzy 2000 a ${currentYear}` }
+    }
+
+    return { isValid: true }
+  }
+
   const handleAddInvoice = async () => {
     try {
       let pdfUrl: string | null = null
@@ -526,19 +606,37 @@ export default function FinancialDashboard() {
       }
 
       const invoiceId = newInvoice.id || generateNextInvoiceNumber()
+
+      // Validate invoice format
+      const validation = validateInvoiceFormat(invoiceId)
+      if (!validation.isValid) {
+        alert(validation.error)
+        return
+      }
+
+      // Check if invoice ID already exists
+      const invoiceExists = invoices.some(inv => 
+        inv.id === invoiceId && (!editingItem || inv.id !== editingItem.id)
+      )
+
+      if (invoiceExists) {
+        alert(`Faktura o numerze ${invoiceId} już istnieje. Wybierz inny numer.`)
+        return
+      }
+
       const vatRate = Number.parseFloat(newInvoice.vatRate)
       const amount = Number.parseFloat(newInvoice.amount)
 
       const invoiceData: Invoice = {
         id: invoiceId,
-        date: new Date().toISOString().split("T")[0],
-        sentDate: null,
+        date: editingItem ? editingItem.date : new Date().toISOString().split("T")[0],
+        sentDate: editingItem ? editingItem.sentDate : null,
         client: newInvoice.client,
         amount: amount,
         tax: amount * (vatRate / 100),
         vatRate: vatRate,
-        status: "Stworzona",
-        pdfUrl,
+        status: editingItem ? editingItem.status : "Stworzona",
+        pdfUrl: pdfUrl || (editingItem ? editingItem.pdfUrl : null),
         dueDate: newInvoice.dueDate,
         representativeName: newInvoice.representativeName,
         representativeEmail: newInvoice.representativeEmail,
@@ -549,16 +647,14 @@ export default function FinancialDashboard() {
         const oldInvoice = invoices.find((inv) => inv.id === editingItem.id)
         setInvoices(
           invoices.map((inv) =>
-            inv.id === editingItem.id
-              ? { ...inv, ...invoiceData, id: editingItem.id, status: inv.status, sentDate: inv.sentDate }
-              : inv,
+            inv.id === editingItem.id ? invoiceData : inv
           ),
         )
         addToHistory(
           "Edytowano",
           "Faktura",
-          editingItem.id,
-          `Edytowano fakturę ${editingItem.id}`,
+          invoiceData.id,
+          `Edytowano fakturę ${editingItem.id}${editingItem.id !== invoiceData.id ? ` (zmieniono numer na ${invoiceData.id})` : ''}`,
           { before: oldInvoice, after: invoiceData },
           user,
         )
@@ -1205,136 +1301,141 @@ export default function FinancialDashboard() {
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>{editingItem ? "Edytuj fakturę" : "Dodaj nową fakturę"}</DialogTitle>
-                      <DialogDescription>Wprowadź szczegóły faktury i opcjonalnie prześlij PDF</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="id">Numer faktury</Label>
-                        <Input
-                          id="id"
-                          placeholder={generateNextInvoiceNumber()}
-                          value={newInvoice.id}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, id: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground">Pozostaw puste, aby użyć automatycznego numeru</p>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="client">Klient</Label>
-                        <Input
-                          id="client"
-                          placeholder="Nazwa klienta"
-                          value={newInvoice.client}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="amount">Kwota (zł)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          placeholder="0.00"
-                          value={newInvoice.amount}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="vatRate">Stawka VAT (%)</Label>
-                        <Input
-                          id="vatRate"
-                          type="number"
-                          placeholder="23"
-                          value={newInvoice.vatRate}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, vatRate: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="dueDate">Termin płatności</Label>
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          value={newInvoice.dueDate}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="description">Opis</Label>
-                        <Textarea
-                          id="description"
-                          placeholder="Opis faktury"
-                          value={newInvoice.description}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, description: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="representativeName">Przedstawiciel firmy (wołacz)</Label>
-                        <Input
-                          id="representativeName"
-                          placeholder="Imię i nazwisko w wołaczu"
-                          value={newInvoice.representativeName}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, representativeName: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="representativeGender">Płeć przedstawiciela</Label>
-                        <Select
-                          value={newInvoice.representativeGender}
-                          onValueChange={(value) => setNewInvoice({ ...newInvoice, representativeGender: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Wybierz płeć" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="male">Mężczyzna</SelectItem>
-                            <SelectItem value="female">Kobieta</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="representativeEmail">Email przedstawiciela</Label>
-                        <Input
-                          id="representativeEmail"
-                          type="email"
-                          placeholder="email@firma.com"
-                          value={newInvoice.representativeEmail}
-                          onChange={(e) => setNewInvoice({ ...newInvoice, representativeEmail: e.target.value })}
-                        />
-                      </div>
-                      <Separator />
-                      <div className="grid gap-2">
-                        <Label htmlFor="invoice-pdf">PDF faktury (opcjonalnie)</Label>
-                        <Input
-                          id="invoice-pdf"
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => setSelectedInvoiceFile(e.target.files?.[0] || null)}
-                        />
-                        {selectedInvoiceFile && (
-                          <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
-                            <div>
-                              <p>Wybrany plik: {selectedInvoiceFile.name}</p>
-                              <p className="text-muted-foreground">
-                                Rozmiar: {(selectedInvoiceFile.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddInvoice();
+                    }}>
+                      <DialogHeader>
+                        <DialogTitle>{editingItem ? "Edytuj fakturę" : "Dodaj nową fakturę"}</DialogTitle>
+                        <DialogDescription>Wprowadź szczegóły faktury i opcjonalnie prześlij PDF</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="id">Numer faktury</Label>
+                          <Input
+                            id="id"
+                            placeholder={generateNextInvoiceNumber()}
+                            value={newInvoice.id}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, id: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">Pozostaw puste, aby użyć automatycznego numeru</p>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="client">Klient</Label>
+                          <Input
+                            id="client"
+                            placeholder="Nazwa klienta"
+                            value={newInvoice.client}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="amount">Kwota (zł)</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            placeholder="0.00"
+                            value={newInvoice.amount}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="vatRate">Stawka VAT (%)</Label>
+                          <Input
+                            id="vatRate"
+                            type="number"
+                            placeholder="23"
+                            value={newInvoice.vatRate}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, vatRate: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="dueDate">Termin płatności</Label>
+                          <Input
+                            id="dueDate"
+                            type="date"
+                            value={newInvoice.dueDate}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="description">Opis</Label>
+                          <Textarea
+                            id="description"
+                            placeholder="Opis faktury"
+                            value={newInvoice.description}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, description: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="representativeName">Przedstawiciel firmy (wołacz)</Label>
+                          <Input
+                            id="representativeName"
+                            placeholder="Imię i nazwisko w wołaczu"
+                            value={newInvoice.representativeName}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, representativeName: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="representativeGender">Płeć przedstawiciela</Label>
+                          <Select
+                            value={newInvoice.representativeGender}
+                            onValueChange={(value) => setNewInvoice({ ...newInvoice, representativeGender: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Wybierz płeć" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Mężczyzna</SelectItem>
+                              <SelectItem value="female">Kobieta</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="representativeEmail">Email przedstawiciela</Label>
+                          <Input
+                            id="representativeEmail"
+                            type="email"
+                            placeholder="email@firma.com"
+                            value={newInvoice.representativeEmail}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, representativeEmail: e.target.value })}
+                          />
+                        </div>
+                        <Separator />
+                        <div className="grid gap-2">
+                          <Label htmlFor="invoice-pdf">PDF faktury (opcjonalnie)</Label>
+                          <Input
+                            id="invoice-pdf"
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => setSelectedInvoiceFile(e.target.files?.[0] || null)}
+                          />
+                          {selectedInvoiceFile && (
+                            <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
+                              <div>
+                                <p>Wybrany plik: {selectedInvoiceFile.name}</p>
+                                <p className="text-muted-foreground">
+                                  Rozmiar: {(selectedInvoiceFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedInvoiceFile(null)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedInvoiceFile(null)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleAddInvoice} className="transition-all duration-200 hover:scale-105">
-                        {editingItem ? "Zapisz zmiany" : "Dodaj fakturę"}
-                      </Button>
-                    </DialogFooter>
+                      <DialogFooter>
+                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                          {editingItem ? "Zapisz zmiany" : "Dodaj fakturę"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -1365,39 +1466,47 @@ export default function FinancialDashboard() {
                       {invoice.tax.toLocaleString()} zł ({invoice.vatRate}%)
                     </TableCell>
                     <TableCell className="relative">
-                      <Badge
-                        variant={
-                          invoice.status === "Zapłacona"
-                            ? "default"
-                            : invoice.status === "Przeterminowana"
-                              ? "destructive"
-                              : invoice.status === "Wysłana"
-                                ? "secondary"
-                                : "outline"
-                        }
-                        className="cursor-pointer"
-                        onClick={() => setIsStatusDropdownOpen(isStatusDropdownOpen === invoice.id ? null : invoice.id)}
-                      >
-                        {invoice.status}
-                      </Badge>
-
-                      {isStatusDropdownOpen === invoice.id && (
-                        <div className="absolute z-10 mt-1 w-40 rounded-md bg-popover shadow-lg ring-1 ring-black ring-opacity-5">
-                          <div className="py-1" role="menu" aria-orientation="vertical">
-                            {["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].map((status) => (
-                              <button
-                                key={status}
-                                className={`block w-full px-4 py-2 text-left text-sm hover:bg-accent ${
-                                  status === invoice.status ? "bg-muted" : ""
-                                }`}
-                                onClick={() => handleStatusChange(invoice.id, status)}
-                              >
-                                {status}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Badge
+                            variant={
+                              invoice.status === "Zapłacona"
+                                ? "default"
+                                : invoice.status === "Przeterminowana"
+                                  ? "destructive"
+                                  : invoice.status === "Wysłana"
+                                    ? "secondary"
+                                    : "outline"
+                            }
+                            className="cursor-pointer hover:opacity-80"
+                          >
+                            {invoice.status}
+                          </Badge>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2 grid gap-1">
+                          {["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].map((status) => (
+                            <Badge
+                              key={status}
+                              variant={
+                                status === "Zapłacona"
+                                  ? "default"
+                                  : status === "Przeterminowana"
+                                    ? "destructive"
+                                    : status === "Wysłana"
+                                      ? "secondary"
+                                      : "outline"
+                              }
+                              className={cn(
+                                "cursor-pointer hover:opacity-80 justify-center",
+                                status === invoice.status && "opacity-50 pointer-events-none"
+                              )}
+                              onClick={() => handleStatusChange(invoice.id, status)}
+                            >
+                              {status}
+                            </Badge>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell>
                       {invoice.pdfUrl ? (
