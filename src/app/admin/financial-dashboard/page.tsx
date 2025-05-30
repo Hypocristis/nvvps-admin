@@ -295,7 +295,7 @@ export default function FinancialDashboard() {
     representativeName: "",
     representativeEmail: "",
     representativeGender: "male",
-    vatRate: "23",
+    vatRate: "8",
   })
 
   const [newExpense, setNewExpense] = useState({
@@ -440,20 +440,27 @@ export default function FinancialDashboard() {
 
   // Add this function to generate next invoice number
   const generateNextInvoiceNumber = () => {
-    if (invoices.length === 0)
-      return `1/${String(new Date().getMonth() + 1).padStart(2, "0")}/${new Date().getFullYear()}`
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0")
+    const currentYear = new Date().getFullYear()
 
-    // Extract the numeric part of the last invoice ID
-    const lastInvoice = [...invoices].sort((a, b) => {
+    // Filter invoices for current month and year
+    const currentMonthInvoices = invoices.filter(invoice => {
+      const [_, month, year] = invoice.id.split("/")
+      return month === currentMonth && year === currentYear.toString()
+    })
+
+    if (currentMonthInvoices.length === 0) {
+      return `1/${currentMonth}/${currentYear}`
+    }
+
+    // Extract the numeric part of the last invoice ID for current month
+    const lastInvoice = [...currentMonthInvoices].sort((a, b) => {
       const numA = Number.parseInt(a.id.split("/")[0])
       const numB = Number.parseInt(b.id.split("/")[0])
       return numB - numA
     })[0]
 
     const lastNumber = Number.parseInt(lastInvoice.id.split("/")[0])
-    const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0")
-    const currentYear = new Date().getFullYear()
-
     return `${lastNumber + 1}/${currentMonth}/${currentYear}`
   }
 
