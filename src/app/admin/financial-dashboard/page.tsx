@@ -53,6 +53,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { useInvoices } from '@/hooks/useInvoices';
+import { Toaster } from "@/components/ui/sonner"
+import { toast } from "sonner"
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -69,7 +72,11 @@ interface Invoice {
   representativeName: string;
   representativeEmail: string;
   representativeGender: string;
+  invoiceNumber: string;
 }
+
+// Add this type after the Invoice interface
+type InvoiceStatus = "Stworzona" | "Wysłana" | "Zapłacona" | "Przeterminowana";
 
 // History logging system
 const historyLog: any[] = []
@@ -112,6 +119,7 @@ const initialInvoices: Invoice[] = [
     representativeName: "Anna Kowalska",
     representativeEmail: "anna.kowalska@acme.com",
     representativeGender: "female",
+    invoiceNumber: "1/01/2024",
   },
   {
     id: "2/01/2024",
@@ -127,6 +135,7 @@ const initialInvoices: Invoice[] = [
     representativeName: "Piotr Nowak",
     representativeEmail: "piotr.nowak@techstart.com",
     representativeGender: "male",
+    invoiceNumber: "2/01/2024",
   },
   {
     id: "3/01/2024",
@@ -142,6 +151,7 @@ const initialInvoices: Invoice[] = [
     representativeName: "Maria Wiśniewska",
     representativeEmail: "maria.wisniewska@global.com",
     representativeGender: "female",
+    invoiceNumber: "3/01/2024",
   },
   {
     id: "4/02/2024",
@@ -157,6 +167,7 @@ const initialInvoices: Invoice[] = [
     representativeName: "Tomasz Zieliński",
     representativeEmail: "tomasz.zielinski@innovation.com",
     representativeGender: "male",
+    invoiceNumber: "4/02/2024",
   },
 ]
 
@@ -263,9 +274,18 @@ const initialRecurringPayments = [
 
 export default function FinancialDashboard() {
   const { user, isLoaded, isSignedIn } = useUser()
+  const {
+    invoices,
+    isLoading: isLoadingInvoices,
+    error: invoicesError,
+    addInvoice,
+    editInvoice,
+    removeInvoice,
+    changeInvoiceStatus,
+    getNextInvoiceNumber,
+  } = useInvoices();
 
   // Data states
-  const [invoices, setInvoices] = useState(initialInvoices)
   const [expenses, setExpenses] = useState(initialExpenses)
   const [offers, setOffers] = useState(initialOffers)
   const [recurringPayments, setRecurringPayments] = useState(initialRecurringPayments)
@@ -278,6 +298,16 @@ export default function FinancialDashboard() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState("")
+
+  // Effect to fetch next invoice number
+  useEffect(() => {
+    const fetchNextNumber = async () => {
+      const number = await getNextInvoiceNumber();
+      setNextInvoiceNumber(number || "");
+    };
+    fetchNextNumber();
+  }, [getNextInvoiceNumber]);
 
   // Modal states
   const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false)
@@ -293,7 +323,7 @@ export default function FinancialDashboard() {
 
   // Form states
   const [newInvoice, setNewInvoice] = useState({
-    id: "",
+    invoiceNumber: "",
     client: "",
     amount: "",
     dueDate: "",
@@ -301,8 +331,8 @@ export default function FinancialDashboard() {
     representativeName: "",
     representativeEmail: "",
     representativeGender: "male",
-    vatRate: "8",
-  })
+    vatRate: "23",
+  });
 
   const [newExpense, setNewExpense] = useState({
     description: "",
@@ -338,29 +368,34 @@ export default function FinancialDashboard() {
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Reset time part for accurate date comparison
 
-    setInvoices(currentInvoices =>
-      currentInvoices.map(invoice => {
-        const dueDate = new Date(invoice.dueDate)
-        dueDate.setHours(0, 0, 0, 0)
+    const updatedInvoices = invoices.map(invoice => {
+      const dueDate = new Date(invoice.dueDate)
+      dueDate.setHours(0, 0, 0, 0)
 
-        // If due date has passed and invoice is not paid, mark as overdue
-        if (dueDate < today && invoice.status !== "Zapłacona") {
-          if (invoice.status !== "Przeterminowana") {
-            // Only add to history if status is actually changing
-            addToHistory(
-              "Edytowano",
-              "Faktura",
-              invoice.id,
-              `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
-              { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
-              user,
-            )
-          }
-          return { ...invoice, status: "Przeterminowana" }
+      // If due date has passed and invoice is not paid, mark as overdue
+      if (dueDate < today && invoice.status !== "Zapłacona") {
+        if (invoice.status !== "Przeterminowana") {
+          // Only add to history if status is actually changing
+          addToHistory(
+            "Edytowano",
+            "Faktura",
+            invoice.id,
+            `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
+            { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
+            user,
+          )
         }
-        return invoice
-      })
-    )
+        return { ...invoice, status: "Przeterminowana" as const }
+      }
+      return invoice
+    })
+
+    // Update invoices through the hook's function
+    updatedInvoices.forEach(invoice => {
+      if (invoice.status === "Przeterminowana") {
+        changeInvoiceStatus(invoice.id, "Przeterminowana")
+      }
+    })
   }
 
   // Add useEffect to check for overdue invoices
@@ -487,78 +522,28 @@ export default function FinancialDashboard() {
     return matchesSearch
   })
 
-  // Add this function to generate next invoice number
-  const generateNextInvoiceNumber = () => {
-    const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0")
-    const currentYear = new Date().getFullYear()
-
-    // Filter invoices for current month and year
-    const currentMonthInvoices = invoices.filter(invoice => {
-      const [_, month, year] = invoice.id.split("/")
-      return month === currentMonth && year === currentYear.toString()
-    })
-
-    if (currentMonthInvoices.length === 0) {
-      return `1/${currentMonth}/${currentYear}`
-    }
-
-    // Extract the numeric part of the last invoice ID for current month
-    const lastInvoice = [...currentMonthInvoices].sort((a, b) => {
-      const numA = Number.parseInt(a.id.split("/")[0])
-      const numB = Number.parseInt(b.id.split("/")[0])
-      return numB - numA
-    })[0]
-
-    const lastNumber = Number.parseInt(lastInvoice.id.split("/")[0])
-    return `${lastNumber + 1}/${currentMonth}/${currentYear}`
-  }
-
   // Add this function to handle status change
-  const handleStatusChange = (invoiceId: string, newStatus: string) => {
-    setInvoices(
-      invoices.map((invoice) => {
-        if (invoice.id === invoiceId) {
-          const updatedInvoice: Invoice = {
-            ...invoice,
-            status: newStatus,
-            sentDate: newStatus === "Wysłana" ? new Date().toISOString().split("T")[0] : invoice.sentDate,
-          }
-
-          addToHistory(
-            "Edytowano",
-            "Faktura",
-            invoiceId,
-            `Zmieniono status faktury ${invoiceId} na ${newStatus}`,
-            { before: { status: invoice.status }, after: { status: newStatus } },
-            user,
-          )
-
-          return updatedInvoice
-        }
-        return invoice
-      }),
-    )
-
-    setIsStatusDropdownOpen(null)
-  }
+  const handleStatusChange = async (invoiceId: string, newStatus: InvoiceStatus) => {
+    try {
+      await changeInvoiceStatus(invoiceId, newStatus);
+      toast.success("Status updated successfully");
+      setIsStatusDropdownOpen(null);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    }
+  };
 
   // Add this function to handle invoice deletion
-  const handleDeleteInvoice = (invoiceId: string) => {
-    const invoiceToDelete = invoices.find((inv) => inv.id === invoiceId)
-
-    if (invoiceToDelete) {
-      addToHistory(
-        "Usunięto",
-        "Faktura",
-        invoiceId,
-        `Usunięto fakturę ${invoiceId}`,
-        { deleted: invoiceToDelete },
-        user,
-      )
-
-      setInvoices(invoices.filter((inv) => inv.id !== invoiceId))
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    try {
+      await removeInvoice(invoiceId);
+      toast.success("Invoice deleted successfully");
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      toast.error("Failed to delete invoice");
     }
-  }
+  };
 
   // Add this function to open PDF modal
   const openPdfModal = (url: string) => {
@@ -600,79 +585,44 @@ export default function FinancialDashboard() {
 
   const handleAddInvoice = async () => {
     try {
-      let pdfUrl: string | null = null
-      if (selectedInvoiceFile) {
-        pdfUrl = await uploadToGoogleDrive(selectedInvoiceFile, `invoice-${Date.now()}.pdf`)
+      // Only generate number if user hasn't provided one
+      let invoiceNumber: string = newInvoice.invoiceNumber || '';
+      if (!invoiceNumber || invoiceNumber.trim() === '') {
+        const generatedNumber = await getNextInvoiceNumber();
+        if (!generatedNumber) {
+          toast.error("Failed to generate invoice number");
+          return;
+        }
+        invoiceNumber = generatedNumber;
       }
 
-      const invoiceId = newInvoice.id || generateNextInvoiceNumber()
-
-      // Validate invoice format
-      const validation = validateInvoiceFormat(invoiceId)
-      if (!validation.isValid) {
-        alert(validation.error)
-        return
-      }
-
-      // Check if invoice ID already exists
-      const invoiceExists = invoices.some(inv => 
-        inv.id === invoiceId && (!editingItem || inv.id !== editingItem.id)
-      )
-
-      if (invoiceExists) {
-        alert(`Faktura o numerze ${invoiceId} już istnieje. Wybierz inny numer.`)
-        return
-      }
-
-      const vatRate = Number.parseFloat(newInvoice.vatRate)
-      const amount = Number.parseFloat(newInvoice.amount)
-
-      const invoiceData: Invoice = {
-        id: invoiceId,
+      const invoiceData = {
+        invoiceNumber,
         date: editingItem ? editingItem.date : new Date().toISOString().split("T")[0],
         sentDate: editingItem ? editingItem.sentDate : null,
         client: newInvoice.client,
-        amount: amount,
-        tax: amount * (vatRate / 100),
-        vatRate: vatRate,
+        amount: Number.parseFloat(newInvoice.amount),
+        tax: Number.parseFloat(newInvoice.amount) * (Number.parseFloat(newInvoice.vatRate) / 100),
+        vatRate: Number.parseFloat(newInvoice.vatRate),
         status: editingItem ? editingItem.status : "Stworzona",
-        pdfUrl: pdfUrl || (editingItem ? editingItem.pdfUrl : null),
         dueDate: newInvoice.dueDate,
         representativeName: newInvoice.representativeName,
         representativeEmail: newInvoice.representativeEmail,
         representativeGender: newInvoice.representativeGender,
-      }
+        pdfUrl: null,
+      };
 
       if (editingItem) {
-        const oldInvoice = invoices.find((inv) => inv.id === editingItem.id)
-        setInvoices(
-          invoices.map((inv) =>
-            inv.id === editingItem.id ? invoiceData : inv
-          ),
-        )
-        addToHistory(
-          "Edytowano",
-          "Faktura",
-          invoiceData.id,
-          `Edytowano fakturę ${editingItem.id}${editingItem.id !== invoiceData.id ? ` (zmieniono numer na ${invoiceData.id})` : ''}`,
-          { before: oldInvoice, after: invoiceData },
-          user,
-        )
+        await editInvoice(editingItem.id, invoiceData, selectedInvoiceFile || undefined);
+        toast.success("Invoice updated successfully");
       } else {
-        setInvoices([...invoices, invoiceData])
-        addToHistory(
-          "Dodano",
-          "Faktura",
-          invoiceData.id,
-          `Dodano nową fakturę ${invoiceData.id} dla ${invoiceData.client}`,
-          { before: null, after: invoiceData },
-          user,
-        )
+        await addInvoice(invoiceData, selectedInvoiceFile || undefined);
+        toast.success("Invoice created successfully");
       }
 
-      setIsAddInvoiceOpen(false)
+      setIsAddInvoiceOpen(false);
       setNewInvoice({
-        id: "",
+        invoiceNumber: "",
         client: "",
         amount: "",
         dueDate: "",
@@ -681,13 +631,14 @@ export default function FinancialDashboard() {
         representativeEmail: "",
         representativeGender: "male",
         vatRate: "23",
-      })
-      setSelectedInvoiceFile(null)
-      setEditingItem(null)
+      });
+      setSelectedInvoiceFile(null);
+      setEditingItem(null);
     } catch (error) {
-      console.error("Error adding invoice:", error)
+      console.error("Error handling invoice:", error);
+      toast.error("Failed to handle invoice");
     }
-  }
+  };
 
   const handleAddExpense = async () => {
     try {
@@ -832,7 +783,7 @@ export default function FinancialDashboard() {
 
     if (type === "invoice") {
       setNewInvoice({
-        id: item.id,
+        invoiceNumber: item.invoiceNumber,
         client: item.client,
         amount: item.amount.toString(),
         dueDate: item.dueDate,
@@ -1119,7 +1070,7 @@ export default function FinancialDashboard() {
                   ) : (
                     <div className="text-2xl font-bold">{totalTax.toLocaleString()} zł</div>
                   )}
-                  <p className="text-xs text-muted-foreground">Stawka VAT 23%</p>
+                  <p className="text-xs text-muted-foreground">Zgodnie określoną stawką VAT</p>
                 </CardContent>
               </Card>
             </div>
@@ -1166,7 +1117,7 @@ export default function FinancialDashboard() {
                       {invoices.slice(0, 3).map((invoice) => (
                         <div key={invoice.id} className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{invoice.id}</p>
+                            <p className="font-medium">{invoice.invoiceNumber}</p>
                             <p className="text-sm text-muted-foreground">{invoice.client}</p>
                           </div>
                           <div className="text-right">
@@ -1280,9 +1231,10 @@ export default function FinancialDashboard() {
                   placeholder="Szukaj faktury..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-[350px]"
                 />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[250px]">
                     <SelectValue placeholder="Filtruj status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1311,12 +1263,12 @@ export default function FinancialDashboard() {
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="id">Numer faktury</Label>
+                          <Label htmlFor="invoiceNumber">Numer faktury</Label>
                           <Input
-                            id="id"
-                            placeholder={generateNextInvoiceNumber()}
-                            value={newInvoice.id}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, id: e.target.value })}
+                            id="invoiceNumber"
+                            placeholder={nextInvoiceNumber}
+                            value={newInvoice.invoiceNumber}
+                            onChange={(e) => setNewInvoice({ ...newInvoice, invoiceNumber: e.target.value })}
                           />
                           <p className="text-xs text-muted-foreground">Pozostaw puste, aby użyć automatycznego numeru</p>
                         </div>
@@ -1344,7 +1296,7 @@ export default function FinancialDashboard() {
                           <Input
                             id="vatRate"
                             type="number"
-                            placeholder="23"
+                            placeholder="8"
                             value={newInvoice.vatRate}
                             onChange={(e) => setNewInvoice({ ...newInvoice, vatRate: e.target.value })}
                           />
@@ -1458,7 +1410,7 @@ export default function FinancialDashboard() {
               <TableBody>
                 {filteredInvoices.map((invoice) => (
                   <TableRow key={invoice.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
+                    <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.sentDate || "-"}</TableCell>
                     <TableCell>{invoice.client}</TableCell>
                     <TableCell>{invoice.amount.toLocaleString()} zł</TableCell>
@@ -1484,7 +1436,7 @@ export default function FinancialDashboard() {
                           </Badge>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-2 grid gap-1">
-                          {["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].map((status) => (
+                          {(["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"] as InvoiceStatus[]).map((status) => (
                             <Badge
                               key={status}
                               variant={
@@ -2206,6 +2158,7 @@ export default function FinancialDashboard() {
           </div>
         </div>
       )}
+      <Toaster />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 import { plPL } from "@clerk/localizations"
 import "./globals.css"
+import { FirebaseProvider } from "@/providers/FirebaseProvider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -18,10 +19,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider localization={plPL}>
-      <html lang="pl" className="dark">
-        <body className={inter.className}>{children}</body>
-      </html>
-    </ClerkProvider>
+    <html lang="pl" className="dark">
+      <body className={inter.className}>
+        <ClerkProvider localization={plPL}>
+          <FirebaseProvider>
+            {children}
+          </FirebaseProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   )
 }
