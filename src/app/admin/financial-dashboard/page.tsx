@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils"
 import { useInvoices } from '@/hooks/useInvoices';
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
+import { sendMail } from '@/lib/nodemailer/send-mail';
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -450,22 +451,23 @@ export default function FinancialDashboard() {
   }
 
   // Email API integration
-  const sendReminderEmail = async (invoice: any, userInfo: any) => {
+  const sendReminderEmail = async (invoice: Invoice, userInfo: any) => {
     try {
-      const greeting = invoice.representativeGender === "female" ? "Szanowna Pani" : "Szanowny Panie"
-
+      const greeting = invoice.representativeGender === "female" ? "Szanowna Pani" : "Szanowny Panie";
+      
       const emailData = {
-        to: invoice.representativeEmail,
-        subject: `Przypomnienie o płatności - Faktura ${invoice.id}`,
+        sendTo: invoice.representativeEmail,
+        subject: `Przypomnienie o płatności - Faktura ${invoice.invoiceNumber}`,
+        text: `Przypomnienie o płatności za fakturę ${invoice.invoiceNumber}`,
         html: `
           <h2>Przypomnienie o płatności</h2>
           <p>${greeting} ${invoice.representativeName},</p>
           
-          <p>Uprzejmie przypominamy o zaległej płatności za fakturę <strong>${invoice.id}</strong> z dnia ${invoice.date}.</p>
+          <p>Uprzejmie przypominamy o zaległej płatności za fakturę <strong>${invoice.invoiceNumber}</strong> z dnia ${invoice.date}.</p>
           
           <h3>Szczegóły faktury:</h3>
           <ul>
-            <li><strong>Numer:</strong> ${invoice.id}</li>
+            <li><strong>Numer:</strong> ${invoice.invoiceNumber}</li>
             <li><strong>Kwota:</strong> ${invoice.amount.toLocaleString()} zł</li>
             <li><strong>Termin płatności:</strong> ${invoice.dueDate}</li>
             <li><strong>Klient:</strong> ${invoice.client}</li>
@@ -474,22 +476,15 @@ export default function FinancialDashboard() {
           <p>Prosimy o jak najszybsze uregulowanie należności.</p>
           
           <p>Z poważaniem,<br>
-          ${userInfo?.fullName || userInfo?.name || "Panel Finansowy"}<br>
-          ${userInfo?.primaryEmailAddress?.emailAddress || userInfo?.email}</p>
-        `,
-      }
+          ${userInfo?.fullName || "Panel Finansowy"}</p>
+        `
+      };
 
-      // Mock Email API call (replace with actual service like SendGrid, Resend, etc.)
-      console.log("Sending email via API:", emailData)
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      console.log("Email sent successfully!")
-      return true
+      await sendMail(emailData);
+      return true;
     } catch (error) {
-      console.error("Error sending email:", error)
-      throw error
+      console.error("Error sending email:", error);
+      throw error;
     }
   }
 
