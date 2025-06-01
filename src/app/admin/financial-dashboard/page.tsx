@@ -364,6 +364,12 @@ export default function FinancialDashboard() {
   const [currentPdfUrl, setCurrentPdfUrl] = useState("")
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState<string | null>(null)
 
+  // Add this state for the confirmation dialog
+  const [reminderConfirmation, setReminderConfirmation] = useState<{ isOpen: boolean; invoice: Invoice | null }>({
+    isOpen: false,
+    invoice: null
+  });
+
   // Add function to check and update overdue invoices
   const updateOverdueInvoices = () => {
     const today = new Date()
@@ -453,31 +459,109 @@ export default function FinancialDashboard() {
   // Email API integration
   const sendReminderEmail = async (invoice: Invoice, userInfo: any) => {
     try {
-      const greeting = invoice.representativeGender === "female" ? "Szanowna Pani" : "Szanowny Panie";
-      
       const emailData = {
         sendTo: invoice.representativeEmail,
         subject: `Przypomnienie o płatności - Faktura ${invoice.invoiceNumber}`,
         text: `Przypomnienie o płatności za fakturę ${invoice.invoiceNumber}`,
-        html: `
-          <h2>Przypomnienie o płatności</h2>
-          <p>${greeting} ${invoice.representativeName},</p>
-          
-          <p>Uprzejmie przypominamy o zaległej płatności za fakturę <strong>${invoice.invoiceNumber}</strong> z dnia ${invoice.date}.</p>
-          
-          <h3>Szczegóły faktury:</h3>
-          <ul>
-            <li><strong>Numer:</strong> ${invoice.invoiceNumber}</li>
-            <li><strong>Kwota:</strong> ${invoice.amount.toLocaleString()} zł</li>
-            <li><strong>Termin płatności:</strong> ${invoice.dueDate}</li>
-            <li><strong>Klient:</strong> ${invoice.client}</li>
-          </ul>
-          
-          <p>Prosimy o jak najszybsze uregulowanie należności.</p>
-          
-          <p>Z poważaniem,<br>
-          ${userInfo?.fullName || "Panel Finansowy"}</p>
-        `
+        html: `<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,800;1,800&display=swap');
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #000;
+      background-color: #fff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo {
+      width: 120px;
+      margin-bottom: 20px;
+      filter: invert(1);
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eaeaea;
+    }
+
+    .section:last-child {
+      border-bottom: none;
+    }
+
+    .project {
+      background-color: #fafafa;
+      padding: 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img class="logo" src="https://novelvision.pl/svg/NovelVision_Logo_Sygnet_Bialy.svg" alt="Novel Vision Logo">
+    </div>
+
+    <div class="section">
+      <div class="project">
+        <p>Szanowni Państwo,
+          <br />
+          uprzejmie informujemy o minięciu terminu płatności za fakturę nr ${invoice.invoiceNumber}, który przypada na ${invoice.dueDate}.
+          <br /><br />
+          Kwota do uregulowania wynosi ${invoice.amount.toLocaleString()} zł.
+          <br /><br />
+          Prosimy o niezwłoczne uregulowanie należności.
+          <br /><br />
+          W przypadku dokonania płatności prosimy zignorować niniejsze przypomnienie.
+          <br /><br />
+          Z wyrazami szacunku,
+          <br/>
+          Zespół Novel Vision
+        </p>
+      </div>
+      <div class="footer">
+        <p>Wiadomość wysłana automatycznie, prosimy na nią nie odpowiadać.
+          <br/>
+          © ${new Date().getFullYear()} Novel Vision. Wszystkie prawa zastrzeżone.
+          <br/>
+          Sikorskiego 74, 05-082 Janów
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
       };
 
       await sendMail(emailData);
@@ -841,20 +925,29 @@ export default function FinancialDashboard() {
     }
   }
 
-  const remindClient = async (invoice: any) => {
+  // Update the remindClient function
+  const remindClient = async (invoice: Invoice) => {
+    setReminderConfirmation({ isOpen: true, invoice });
+  }
+
+  const handleConfirmedReminder = async () => {
+    if (!reminderConfirmation.invoice) return;
+
     try {
-      await sendReminderEmail(invoice, user)
+      await sendReminderEmail(reminderConfirmation.invoice, user);
       addToHistory(
         "Wysłano przypomnienie",
         "Faktura",
-        invoice.id,
-        `Wysłano przypomnienie o płatności do ${invoice.representativeEmail}`,
+        reminderConfirmation.invoice.id,
+        `Wysłano przypomnienie o płatności do ${reminderConfirmation.invoice.representativeEmail}`,
         null,
         user,
-      )
-      alert(`Przypomnienie zostało wysłane do ${invoice.representativeEmail}`)
+      );
+      toast.success(`Przypomnienie zostało wysłane do ${reminderConfirmation.invoice.representativeEmail}`);
     } catch (error) {
-      alert("Błąd podczas wysyłania przypomnienia")
+      toast.error("Błąd podczas wysyłania przypomnienia");
+    } finally {
+      setReminderConfirmation({ isOpen: false, invoice: null });
     }
   }
 
@@ -2153,6 +2246,33 @@ export default function FinancialDashboard() {
           </div>
         </div>
       )}
+
+      {/* Add this before the final closing tag */}
+      <Dialog open={reminderConfirmation.isOpen} onOpenChange={(isOpen) => 
+        setReminderConfirmation(prev => ({ ...prev, isOpen }))
+      }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Potwierdź wysłanie przypomnienia</DialogTitle>
+            <DialogDescription>
+              Czy na pewno chcesz wysłać przypomnienie o płatności do {reminderConfirmation.invoice?.representativeEmail}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReminderConfirmation({ isOpen: false, invoice: null })}
+            >
+              Anuluj
+            </Button>
+            <Button
+              onClick={handleConfirmedReminder}
+            >
+              Wyślij przypomnienie
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Toaster />
     </div>
   )
