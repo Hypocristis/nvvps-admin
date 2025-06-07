@@ -57,6 +57,11 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
 import { sendMail } from '@/lib/nodemailer/send-mail';
+import { useExpenses } from '@/hooks/useExpenses';
+import { Switch } from "@/components/ui/switch"
+import { useRecurringPayments } from '@/hooks/useRecurringPayments';
+import { useOffers } from '@/hooks/useOffers';
+import { getHistoryEntries, addHistoryEntry, HistoryEntry } from '@/lib/services/history';
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -67,7 +72,7 @@ interface Invoice {
   amount: number;
   tax: number;
   vatRate: number;
-  status: string;
+  status: "Stworzona" | "Wysłana" | "Zapłacona" | "Przeterminowana";
   pdfUrl: string | null;
   dueDate: string;
   representativeName: string;
@@ -79,199 +84,205 @@ interface Invoice {
 // Add this type after the Invoice interface
 type InvoiceStatus = "Stworzona" | "Wysłana" | "Zapłacona" | "Przeterminowana";
 
-// History logging system
-const historyLog: any[] = []
-
-const addToHistory = (
-  action: string,
-  type: string,
-  itemId: string,
-  description: string,
-  changes: any = null,
-  user: any,
-) => {
-  const historyEntry = {
-    id: `hist-${Date.now()}`,
-    timestamp: new Date().toLocaleString("pl-PL"),
-    user: user || { name: "System", email: "system@app.com" },
-    action,
-    type,
-    itemId,
-    description,
-    changes,
-    revertible: action !== "Wysłano przypomnienie",
-  }
-  historyLog.unshift(historyEntry)
+// Add back the RecurringPayment interface
+interface RecurringPayment {
+  id: string;
+  name: string;
+  amount: number;
+  frequency: string;
+  nextPayment: string;
+  category: string;
+  active: boolean;
+  pdfUrl: string | null;
+  createdAt: string;
 }
 
-// Mock data - Faktury
-const initialInvoices: Invoice[] = [
-  {
-    id: "1/01/2024",
-    date: "2024-01-15",
-    sentDate: "2024-01-15",
-    client: "Acme Corp",
-    amount: 20000,
-    tax: 4600,
-    vatRate: 23,
-    status: "Zapłacona",
-    pdfUrl: null,
-    dueDate: "2024-02-15",
-    representativeName: "Anna Kowalska",
-    representativeEmail: "anna.kowalska@acme.com",
-    representativeGender: "female",
-    invoiceNumber: "1/01/2024",
-  },
-  {
-    id: "2/01/2024",
-    date: "2024-01-20",
-    sentDate: "2024-01-20",
-    client: "TechStart Inc",
-    amount: 12800,
-    tax: 2944,
-    vatRate: 23,
-    status: "Przeterminowana",
-    pdfUrl: "drive.google.com/file/123",
-    dueDate: "2024-02-05",
-    representativeName: "Piotr Nowak",
-    representativeEmail: "piotr.nowak@techstart.com",
-    representativeGender: "male",
-    invoiceNumber: "2/01/2024",
-  },
-  {
-    id: "3/01/2024",
-    date: "2024-01-25",
-    sentDate: "2024-01-25",
-    client: "Global Solutions",
-    amount: 30000,
-    tax: 6900,
-    vatRate: 23,
-    status: "Zapłacona",
-    pdfUrl: "drive.google.com/file/124",
-    dueDate: "2024-02-25",
-    representativeName: "Maria Wiśniewska",
-    representativeEmail: "maria.wisniewska@global.com",
-    representativeGender: "female",
-    invoiceNumber: "3/01/2024",
-  },
-  {
-    id: "4/02/2024",
-    date: "2024-02-01",
-    sentDate: null,
-    client: "Innovation Labs",
-    amount: 16800,
-    tax: 3864,
-    vatRate: 23,
-    status: "Stworzona",
-    pdfUrl: null,
-    dueDate: "2024-03-01",
-    representativeName: "Tomasz Zieliński",
-    representativeEmail: "tomasz.zielinski@innovation.com",
-    representativeGender: "male",
-    invoiceNumber: "4/02/2024",
-  },
-]
+// Add back the calculateNextPaymentDate function
+const calculateNextPaymentDate = (paymentDate: string, frequency: string): string => {
+  const currentDate = new Date();
+  const baseDate = new Date(paymentDate);
+  const paymentDay = baseDate.getDate();
+  
+  let nextDate = new Date(baseDate);
+  
+  // If the payment date has passed, calculate the next occurrence
+  if (nextDate < currentDate) {
+    nextDate = new Date(currentDate);
+    nextDate.setDate(paymentDay); // Keep the same day of month
+    
+    // If we've already passed this month's date, move to next period
+    if (nextDate < currentDate) {
+      switch (frequency) {
+        case "Miesięcznie":
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
+        case "Kwartalnie":
+          nextDate.setMonth(nextDate.getMonth() + 3);
+          break;
+        case "Rocznie":
+          nextDate.setFullYear(nextDate.getFullYear() + 1);
+          break;
+      }
+    }
+  }
+  
+  return nextDate.toISOString().split('T')[0];
+};
 
-// Mock data - Wydatki
-const initialExpenses = [
-  { id: 1, date: "2024-01-10", description: "Czynsz biura", amount: 8000, category: "Operacyjne", pdfUrl: null },
-  {
-    id: 2,
-    date: "2024-01-15",
-    description: "Kampania marketingowa",
-    amount: 6000,
-    category: "Marketing",
-    pdfUrl: "drive.google.com/file/exp1",
-  },
-  {
-    id: 3,
-    date: "2024-01-20",
-    description: "Subskrypcje oprogramowania",
-    amount: 3200,
-    category: "Subskrypcje",
-    pdfUrl: null,
-  },
-  {
-    id: 4,
-    date: "2024-01-25",
-    description: "Zakup sprzętu",
-    amount: 12800,
-    category: "Sprzęt",
-    pdfUrl: "drive.google.com/file/exp2",
-  },
-  { id: 5, date: "2024-02-01", description: "Koszty podróży", amount: 2600, category: "Podróże", pdfUrl: null },
-]
+// Add LoadingSkeleton component at the top of the file
+const LoadingSkeleton = () => (
+  <div className="space-y-4">
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-8 w-full" />
+  </div>
+);
 
-// Mock data - Oferty
-const initialOffers = [
-  {
-    id: "OF-001",
-    title: "Projekt strony internetowej - Acme Corp",
-    client: "Acme Corp",
-    amount: 25000,
-    createdDate: "2024-01-10",
-    sentDate: "2024-01-12",
-    expirationDate: "2024-02-12",
-    status: "Wysłana",
-    googleDocsUrl: "docs.google.com/document/123",
-    daysToExpiration: 5,
-  },
-  {
-    id: "OF-002",
-    title: "Aplikacja mobilna - TechStart",
-    client: "TechStart Inc",
-    amount: 45000,
-    createdDate: "2024-01-15",
-    sentDate: "2024-01-18",
-    expirationDate: "2024-02-18",
-    status: "Zaakceptowana",
-    googleDocsUrl: "docs.google.com/document/124",
-    daysToExpiration: 11,
-  },
-  {
-    id: "OF-003",
-    title: "Konsultacje IT - Global Solutions",
-    client: "Global Solutions",
-    amount: 15000,
-    createdDate: "2024-02-01",
-    sentDate: null,
-    expirationDate: "2024-03-01",
-    status: "Szkic",
-    googleDocsUrl: "docs.google.com/document/125",
-    daysToExpiration: 23,
-  },
-]
+// Add utility function to calculate recurring payment occurrences
+function calculateRecurringPaymentAmount(payment: RecurringPayment, targetDate: Date): number {
+  console.log('=== Start payment calculation ===');
+  console.log('Payment:', payment);
+  console.log('Target date:', targetDate);
 
-// Mock data - Płatności cykliczne
-const initialRecurringPayments = [
-  {
-    id: 1,
-    name: "Adobe Creative Suite",
-    amount: 299,
-    frequency: "Miesięcznie",
-    nextPayment: "2024-02-15",
-    category: "Subskrypcje",
-    active: true,
-  },
-  {
-    id: 2,
-    name: "Hosting serwera",
-    amount: 150,
-    frequency: "Miesięcznie",
-    nextPayment: "2024-02-20",
-    category: "Operacyjne",
-    active: true,
-  },
-  {
-    id: 3,
-    name: "Ubezpieczenie biznesowe",
-    amount: 800,
-    frequency: "Miesięcznie",
-    nextPayment: "2024-02-25",
-    category: "Ubezpieczenia",
-    active: false,
-  },
-]
+  if (!payment.active) {
+    console.log('Payment is inactive');
+    return 0;
+  }
+
+  const startDate = new Date(payment.createdAt);
+  const paymentDate = new Date(payment.nextPayment);
+  const currentDate = new Date(targetDate);
+
+  console.log('Initial dates:');
+  console.log('- Start date:', startDate.toISOString());
+  console.log('- Payment date:', paymentDate.toISOString());
+  console.log('- Current date:', currentDate.toISOString());
+
+  // If the payment hasn't started yet
+  if (currentDate < startDate) {
+    console.log('Payment has not started yet');
+    return 0;
+  }
+
+  // For the current month check, we only care about the day of the month
+  const currentDay = currentDate.getDate();
+  const paymentDay = paymentDate.getDate();
+
+  // If we're checking the current month and the payment day hasn't passed yet
+  if (currentDate.getFullYear() === targetDate.getFullYear() && 
+      currentDate.getMonth() === targetDate.getMonth() && 
+      currentDay < paymentDay) {
+    console.log('Payment day has not passed in current month');
+    console.log(`Current day: ${currentDay}, Payment day: ${paymentDay}`);
+    return 0;
+  }
+
+  let amount = 0;
+  console.log('Checking frequency:', payment.frequency);
+
+  switch (payment.frequency) {
+    case 'Miesięcznie':
+      // For monthly payments, always include if the payment day has passed
+      amount = payment.amount;
+      console.log('Monthly payment amount:', amount);
+      break;
+
+    case 'Kwartalnie':
+      // For quarterly payments, check if this is a payment month
+      const monthsSinceStart = (currentDate.getFullYear() - startDate.getFullYear()) * 12 
+                              + (currentDate.getMonth() - startDate.getMonth());
+      const isQuarterlyPaymentMonth = monthsSinceStart % 3 === 0;
+      amount = isQuarterlyPaymentMonth ? payment.amount : 0;
+      console.log('Quarterly payment check:');
+      console.log('- Months since start:', monthsSinceStart);
+      console.log('- Is payment month:', isQuarterlyPaymentMonth);
+      console.log('- Amount:', amount);
+      break;
+
+    case 'Rocznie':
+      // For yearly payments, check if this is the same month as the start date
+      const isYearlyPaymentMonth = currentDate.getMonth() === startDate.getMonth();
+      amount = isYearlyPaymentMonth ? payment.amount : 0;
+      console.log('Yearly payment check:');
+      console.log('- Current month:', currentDate.getMonth());
+      console.log('- Start month:', startDate.getMonth());
+      console.log('- Is payment month:', isYearlyPaymentMonth);
+      console.log('- Amount:', amount);
+      break;
+
+    default:
+      console.log('Unknown frequency:', payment.frequency);
+      amount = 0;
+  }
+
+  console.log('Final amount:', amount);
+  console.log('=== End payment calculation ===');
+  return amount;
+}
+
+function calculateTotalRecurringForMonth(payments: RecurringPayment[], targetDate: Date): number {
+  return payments
+    .filter(p => p.active)
+    .reduce((sum, payment) => sum + calculateRecurringPaymentAmount(payment, targetDate), 0);
+}
+
+// Add function to calculate accumulated recurring payments
+function calculateAccumulatedRecurringPayments(payments: RecurringPayment[], endDate: Date): number {
+  let total = 0;
+  const currentDate = new Date(endDate);
+  
+  payments.filter(p => p.active).forEach(payment => {
+    const startDate = new Date(payment.nextPayment); // Changed from createdAt to nextPayment
+    
+    console.log(`\nCalculating accumulated payments for: ${payment.name}`);
+    console.log(`Payment date: ${startDate.toISOString().split('T')[0]}`);
+    console.log(`Current date: ${currentDate.toISOString().split('T')[0]}`);
+    console.log(`Amount: ${payment.amount}`);
+    console.log(`Frequency: ${payment.frequency}`);
+    
+    // Calculate full months between start date and current date
+    const startYear = startDate.getFullYear();
+    const startMonth = startDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    // Calculate months difference (0-based)
+    let monthsDiff = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+    
+    // If we're past the payment day in the current month, include this month
+    if (currentDate.getDate() >= startDate.getDate()) {
+      monthsDiff += 1;
+    }
+    
+    console.log(`Months difference: ${monthsDiff}`);
+    
+    let paymentTotal = 0;
+    switch (payment.frequency) {
+      case 'Miesięcznie':
+        paymentTotal = payment.amount * monthsDiff;
+        break;
+        
+      case 'Kwartalnie':
+        // Calculate complete quarters
+        const quarters = Math.floor(monthsDiff / 3);
+        paymentTotal = payment.amount * quarters;
+        break;
+        
+      case 'Rocznie':
+        // Calculate complete years
+        const years = Math.floor(monthsDiff / 12);
+        paymentTotal = payment.amount * years;
+        break;
+    }
+    
+    console.log(`Number of payments: ${monthsDiff}`);
+    console.log(`Total for this payment: ${paymentTotal}`);
+    total += paymentTotal;
+  });
+  
+  console.log(`\nTotal accumulated recurring payments: ${total}`);
+  return total;
+}
 
 export default function FinancialDashboard() {
   const { user, isLoaded, isSignedIn } = useUser()
@@ -286,10 +297,37 @@ export default function FinancialDashboard() {
     getNextInvoiceNumber,
   } = useInvoices();
 
-  // Data states
-  const [expenses, setExpenses] = useState(initialExpenses)
-  const [offers, setOffers] = useState(initialOffers)
-  const [recurringPayments, setRecurringPayments] = useState(initialRecurringPayments)
+  // Add expenses hook
+  const {
+    expenses,
+    isLoading: isLoadingExpenses,
+    error: expensesError,
+    addExpense,
+    editExpense,
+    removeExpense,
+  } = useExpenses();
+
+  // Add recurring payments hook
+  const {
+    payments: recurringPayments,
+    isLoading: isLoadingRecurringPayments,
+    error: recurringPaymentsError,
+    addPayment,
+    editPayment,
+    removePayment,
+    togglePaymentStatus,
+  } = useRecurringPayments();
+
+  // Add the offers hook
+  const {
+    offers,
+    isLoading: isLoadingOffers,
+    error: offersError,
+    addOffer,
+    editOffer,
+    removeOffer,
+    changeOfferStatus,
+  } = useOffers();
 
   // UI states
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -301,6 +339,9 @@ export default function FinancialDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState("")
 
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
   // Effect to fetch next invoice number
   useEffect(() => {
     const fetchNextNumber = async () => {
@@ -309,6 +350,25 @@ export default function FinancialDashboard() {
     };
     fetchNextNumber();
   }, [getNextInvoiceNumber]);
+
+  // Add useEffect to load history entries
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const loadHistoryEntries = async () => {
+      try {
+        const entries = await getHistoryEntries(user.id);
+        setHistoryEntries(entries);
+      } catch (error) {
+        console.error('Error loading history entries:', error);
+        toast.error('Błąd podczas ładowania historii');
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+
+    loadHistoryEntries();
+  }, [user?.id]);
 
   // Modal states
   const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false)
@@ -321,6 +381,7 @@ export default function FinancialDashboard() {
   // File upload states
   const [selectedInvoiceFile, setSelectedInvoiceFile] = useState<File | null>(null)
   const [selectedExpenseFile, setSelectedExpenseFile] = useState<File | null>(null)
+  const [selectedRecurringFile, setSelectedRecurringFile] = useState<File | null>(null)
 
   // Form states
   const [newInvoice, setNewInvoice] = useState({
@@ -369,6 +430,10 @@ export default function FinancialDashboard() {
     isOpen: false,
     invoice: null
   });
+
+  // Add new state for payment display modal
+  const [isPaymentDisplayOpen, setIsPaymentDisplayOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | null>(null);
 
   // Add function to check and update overdue invoices
   const updateOverdueInvoices = () => {
@@ -468,95 +533,189 @@ export default function FinancialDashboard() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Przypomnienie o płatności faktury</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,600;0,800;1,800&display=swap');
-
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       line-height: 1.6;
-      color: #000;
-      background-color: #fff;
+      color: #333;
+      background-color: #f5f5f5;
       margin: 0;
       padding: 0;
     }
-
+    
+    .email-wrapper {
+      background-color: #f5f5f5;
+      padding: 20px 0;
+    }
+    
     .container {
       max-width: 600px;
       margin: 0 auto;
-      padding: 40px 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
-
+    
     .header {
+      background-color: #1a1a1a;
+      padding: 30px 0;
       text-align: center;
-      margin-bottom: 30px;
     }
-
+    
     .logo {
-      width: 120px;
-      margin-bottom: 20px;
-      filter: invert(1);
+      width: 140px;
+      height: auto;
     }
-
-    p {
-      margin-bottom: 16px;
+    
+    .content {
+      padding: 40px 30px;
     }
-
-    .section {
+    
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 25px;
+      color: #333;
+    }
+    
+    .message {
       margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid #eaeaea;
+      font-size: 15px;
     }
-
-    .section:last-child {
-      border-bottom: none;
+    
+    .invoice-details {
+      background-color: #f9f9f9;
+      border-radius: 6px;
+      padding: 25px;
+      margin-bottom: 30px;
+      border-left: 4px solid #e74c3c;
     }
-
-    .project {
-      background-color: #fafafa;
-      padding: 20px;
-      border-radius: 5px;
-      margin-bottom: 20px;
+    
+    .invoice-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
     }
-
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      padding-top: 20px;
+    
+    .invoice-label {
+      font-weight: 600;
+      color: #555;
+    }
+    
+    .invoice-value {
+      font-weight: 700;
+      color: #333;
+    }
+    
+    .amount {
+      font-size: 20px;
+      color: #e74c3c;
+    }
+    
+    .note {
+      font-style: italic;
+      color: #777;
+      margin-top: 25px;
       font-size: 14px;
-      color: #666;
+    }
+    
+    .signature {
+      margin-top: 30px;
+    }
+    
+    .signature-name {
+      font-weight: 600;
+    }
+    
+    .footer {
+      background-color: #f9f9f9;
+      padding: 25px;
+      text-align: center;
+      font-size: 13px;
+      color: #777;
+      border-top: 1px solid #eaeaea;
+    }
+    
+    .footer p {
+      margin-bottom: 10px;
+    }
+    
+    .footer p:last-child {
+      margin-bottom: 0;
+    }
+    
+    @media only screen and (max-width: 480px) {
+      .content {
+        padding: 30px 20px;
+      }
+      
+      .invoice-details {
+        padding: 20px 15px;
+      }
+      
+      .invoice-row {
+        flex-direction: column;
+        margin-bottom: 15px;
+      }
+      
+      .invoice-value {
+        margin-top: 5px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <img class="logo" src="https://novelvision.pl/svg/NovelVision_Logo_Sygnet_Bialy.svg" alt="Novel Vision Logo">
-    </div>
-
-    <div class="section">
-      <div class="project">
-        <p>Szanowni Państwo,
-          <br />
-          uprzejmie informujemy o minięciu terminu płatności za fakturę nr ${invoice.invoiceNumber}, który przypada na ${invoice.dueDate}.
-          <br /><br />
-          Kwota do uregulowania wynosi ${invoice.amount.toLocaleString()} zł.
-          <br /><br />
-          Prosimy o niezwłoczne uregulowanie należności.
-          <br /><br />
-          W przypadku dokonania płatności prosimy zignorować niniejsze przypomnienie.
-          <br /><br />
-          Z wyrazami szacunku,
-          <br/>
-          Zespół Novel Vision
-        </p>
+  <div class="email-wrapper">
+    <div class="container">
+      <div class="header">
+        <img class="logo" src="https://novelvision.pl/svg/NovelVision_Logo_Sygnet_Bialy.svg" alt="Novel Vision Logo">
       </div>
+      
+      <div class="content">
+        <p class="greeting">Szanowni Państwo,</p>
+        
+        <div class="message">
+          <p>Uprzejmie informujemy o <strong>minięciu terminu płatności</strong> za fakturę, której szczegóły znajdują się poniżej.</p>
+        </div>
+        
+        <div class="invoice-details">
+          <div class="invoice-row">
+            <span class="invoice-label">Numer faktury:</span>
+            <span class="invoice-value">${invoice.invoiceNumber}</span>
+          </div>
+          <div class="invoice-row">
+            <span class="invoice-label">Termin płatności:</span>
+            <span class="invoice-value">${invoice.dueDate}</span>
+          </div>
+          <div class="invoice-row">
+            <span class="invoice-label">Kwota do zapłaty:</span>
+            <span class="invoice-value amount">${invoice.amount.toLocaleString()} zł</span>
+          </div>
+        </div>
+        
+        <p>Prosimy o niezwłoczne uregulowanie należności.</p>
+        
+        <p class="note">W przypadku dokonania płatności prosimy zignorować niniejsze przypomnienie.</p>
+        
+        <div class="signature">
+          <p>Z wyrazami szacunku,</p>
+          <p class="signature-name">Zespół Novel Vision</p>
+        </div>
+      </div>
+      
       <div class="footer">
-        <p>Wiadomość wysłana automatycznie, prosimy na nią nie odpowiadać.
-          <br/>
-          © ${new Date().getFullYear()} Novel Vision. Wszystkie prawa zastrzeżone.
-          <br/>
-          Sikorskiego 74, 05-082 Janów
-        </p>
+        <p>Wiadomość wysłana automatycznie, prosimy na nią nie odpowiadać.</p>
+        <p>© ${new Date().getFullYear()} Novel Vision. Wszystkie prawa zastrzeżone.</p>
+        <p>Sikorskiego 74, 05-082 Janów</p>
       </div>
     </div>
   </div>
@@ -572,12 +731,112 @@ export default function FinancialDashboard() {
     }
   }
 
-  // Obliczenia sum
+  // Calculate sums with debug logging
   const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-  const totalTax = invoices.reduce((sum, invoice) => sum + invoice.tax, 0)
+  const totalVat = invoices.reduce((sum, invoice) => sum + invoice.tax, 0)
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const netProfit = totalRevenue - totalExpenses
-  const monthlyRecurring = recurringPayments.filter((p) => p.active).reduce((sum, payment) => sum + payment.amount, 0)
+  
+  console.log('=== Financial Calculations Debug ===');
+  console.log('Total Revenue (Przychód):', totalRevenue);
+  console.log('Total VAT:', totalVat);
+  console.log('Revenue after VAT:', totalRevenue - totalVat);
+  console.log('Total Expenses:', totalExpenses);
+  console.log('Balance before recurring:', totalRevenue - totalVat - totalExpenses);
+
+  // Get current date info
+  const currentDate = new Date()
+  const currentMonth = currentDate.getMonth()
+  const currentYear = currentDate.getFullYear()
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear
+
+  // Calculate recurring payments
+  console.log('\nRecurring Payments:');
+  recurringPayments.forEach(payment => {
+    if (payment.active) {
+      console.log(`Payment: ${payment.name}`);
+      console.log(`Amount: ${payment.amount}`);
+      console.log(`Start date: ${payment.createdAt}`);
+      console.log(`Frequency: ${payment.frequency}`);
+    }
+  });
+
+  // Calculate total accumulated recurring payments for 6 months
+  const accumulatedRecurring = calculateAccumulatedRecurringPayments(recurringPayments, new Date());
+
+  console.log('\nFinal calculations:');
+  console.log('Total accumulated recurring payments:', accumulatedRecurring);
+
+  // Calculate final income with the properly accumulated recurring payments
+  const netProfit = totalRevenue - totalVat - totalExpenses - accumulatedRecurring;
+  console.log('\nFinal income breakdown:');
+  console.log(`Revenue: ${totalRevenue}`);
+  console.log(`VAT: ${totalVat}`);
+  console.log(`Expenses: ${totalExpenses}`);
+  console.log(`Accumulated Recurring: ${accumulatedRecurring}`);
+  console.log(`Final Income: ${netProfit}`);
+
+  // Calculate current month's values
+  const currentMonthInvoices = invoices.filter(invoice => {
+    const invoiceDate = new Date(invoice.date)
+    return invoiceDate.getMonth() === currentMonth && invoiceDate.getFullYear() === currentYear
+  })
+
+  const currentMonthExpenses = expenses.filter(expense => {
+    const expenseDate = new Date(expense.date)
+    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear
+  })
+
+  // Calculate current month's recurring payments
+  const monthlyRecurring = recurringPayments
+    .filter(p => p.active && p.frequency === 'Miesięcznie')
+    .reduce((sum, payment) => sum + payment.amount, 0);
+
+  // Calculate current month's totals
+  const currentMonthRevenue = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
+  const currentMonthVat = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.tax, 0)
+  const currentMonthExpensesTotal = currentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  
+  // Calculate current month's income
+  const currentMonthIncome = currentMonthRevenue - currentMonthVat - currentMonthExpensesTotal - monthlyRecurring
+
+  // Calculate previous month's values
+  const previousMonthInvoices = invoices.filter(invoice => {
+    const invoiceDate = new Date(invoice.date)
+    return invoiceDate.getMonth() === previousMonth && invoiceDate.getFullYear() === previousYear
+  })
+
+  const previousMonthExpenses = expenses.filter(expense => {
+    const expenseDate = new Date(expense.date)
+    return expenseDate.getMonth() === previousMonth && expenseDate.getFullYear() === previousYear
+  })
+
+  // Calculate previous month's recurring payments
+  const previousMonthRecurring = recurringPayments
+    .filter(p => p.active && p.frequency === 'Miesięcznie')
+    .reduce((sum, payment) => sum + payment.amount, 0);
+
+  const previousMonthRevenue = previousMonthInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
+  const previousMonthVat = previousMonthInvoices.reduce((sum, invoice) => sum + invoice.tax, 0)
+  const previousMonthExpensesTotal = previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const previousMonthIncome = previousMonthRevenue - previousMonthVat - previousMonthExpensesTotal - previousMonthRecurring
+
+  // Calculate percentage changes
+  const calculatePercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0
+    return ((current - previous) / previous) * 100
+  }
+
+  const revenueChange = calculatePercentageChange(currentMonthRevenue, previousMonthRevenue)
+  const incomeChange = calculatePercentageChange(currentMonthIncome, previousMonthIncome)
+  const expensesChange = calculatePercentageChange(currentMonthExpensesTotal, previousMonthExpensesTotal)
+  const vatChange = calculatePercentageChange(currentMonthVat, previousMonthVat)
+
+  // Format percentage with sign
+  const formatPercentageChange = (change: number) => {
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${change.toFixed(1)}% od zeszłego miesiąca`
+  }
 
   // Funkcje filtrowania
   const filteredInvoices = invoices.filter((invoice) => {
@@ -604,7 +863,19 @@ export default function FinancialDashboard() {
   // Add this function to handle status change
   const handleStatusChange = async (invoiceId: string, newStatus: InvoiceStatus) => {
     try {
+      const invoice = invoices.find(i => i.id === invoiceId);
       await changeInvoiceStatus(invoiceId, newStatus);
+      await addToHistory(
+        "Edytowano",
+        "Faktura",
+        invoiceId,
+        `Zmieniono status faktury ${invoice?.invoiceNumber} na ${newStatus}`,
+        {
+          before: { status: invoice?.status },
+          after: { status: newStatus },
+        },
+        user,
+      );
       toast.success("Status updated successfully");
       setIsStatusDropdownOpen(null);
     } catch (error) {
@@ -616,7 +887,18 @@ export default function FinancialDashboard() {
   // Add this function to handle invoice deletion
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
+      const invoice = invoices.find(i => i.id === invoiceId);
       await removeInvoice(invoiceId);
+      await addToHistory(
+        "Usunięto",
+        "Faktura",
+        invoiceId,
+        `Usunięto fakturę ${invoice?.invoiceNumber}`,
+        {
+          before: invoice,
+        },
+        user,
+      );
       toast.success("Invoice deleted successfully");
     } catch (error) {
       console.error("Error deleting invoice:", error);
@@ -664,6 +946,32 @@ export default function FinancialDashboard() {
 
   const handleAddInvoice = async () => {
     try {
+      // Validate required fields
+      if (!newInvoice.client.trim()) {
+        toast.error("Nazwa klienta jest wymagana");
+        return;
+      }
+      if (!newInvoice.amount || isNaN(Number(newInvoice.amount)) || Number(newInvoice.amount) <= 0) {
+        toast.error("Kwota musi być poprawną liczbą większą od 0");
+        return;
+      }
+      if (!newInvoice.dueDate) {
+        toast.error("Termin płatności jest wymagany");
+        return;
+      }
+      if (!newInvoice.vatRate || isNaN(Number(newInvoice.vatRate)) || Number(newInvoice.vatRate) < 0) {
+        toast.error("Stawka VAT musi być poprawną liczbą nieujemną");
+        return;
+      }
+      if (!newInvoice.representativeName.trim()) {
+        toast.error("Imię i nazwisko przedstawiciela jest wymagane");
+        return;
+      }
+      if (!newInvoice.representativeEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newInvoice.representativeEmail)) {
+        toast.error("Poprawny adres email przedstawiciela jest wymagany");
+        return;
+      }
+
       // Only generate number if user hasn't provided one
       let invoiceNumber: string = newInvoice.invoiceNumber || '';
       if (!invoiceNumber || invoiceNumber.trim() === '') {
@@ -673,6 +981,13 @@ export default function FinancialDashboard() {
           return;
         }
         invoiceNumber = generatedNumber;
+      } else {
+        // Validate custom invoice number format
+        const validation = validateInvoiceFormat(invoiceNumber);
+        if (!validation.isValid) {
+          toast.error(validation.error || "Nieprawidłowy format numeru faktury");
+          return;
+        }
       }
 
       const invoiceData = {
@@ -693,9 +1008,33 @@ export default function FinancialDashboard() {
 
       if (editingItem) {
         await editInvoice(editingItem.id, invoiceData, selectedInvoiceFile || undefined);
+        await addToHistory(
+          "Edytowano",
+          "Faktura",
+          editingItem.id,
+          `Edytowano fakturę ${invoiceNumber}`,
+          {
+            before: editingItem,
+            after: invoiceData,
+          },
+          user,
+        );
         toast.success("Invoice updated successfully");
       } else {
-        await addInvoice(invoiceData, selectedInvoiceFile || undefined);
+        const newInvoiceRef = await addInvoice(invoiceData, selectedInvoiceFile || undefined);
+        if (!newInvoiceRef?.id) {
+          throw new Error('Failed to create invoice: No ID returned');
+        }
+        await addToHistory(
+          "Dodano",
+          "Faktura",
+          newInvoiceRef.id,
+          `Dodano nową fakturę ${invoiceNumber}`,
+          {
+            after: invoiceData,
+          },
+          user,
+        );
         toast.success("Invoice created successfully");
       }
 
@@ -721,144 +1060,238 @@ export default function FinancialDashboard() {
 
   const handleAddExpense = async () => {
     try {
-      let pdfUrl = null
-      if (selectedExpenseFile) {
-        pdfUrl = await uploadToGoogleDrive(selectedExpenseFile, `expense-${Date.now()}.pdf`)
+      // Validate required fields
+      if (!newExpense.description.trim()) {
+        toast.error("Opis wydatku jest wymagany");
+        return;
+      }
+      if (!newExpense.amount || isNaN(Number(newExpense.amount))) {
+        toast.error("Kwota musi być poprawną liczbą");
+        return;
+      }
+      if (!newExpense.category) {
+        toast.error("Kategoria jest wymagana");
+        return;
+      }
+      if (!newExpense.date) {
+        toast.error("Data jest wymagana");
+        return;
       }
 
       const expenseData = {
-        id: expenses.length + 1,
         date: newExpense.date,
         description: newExpense.description,
         amount: Number.parseFloat(newExpense.amount),
         category: newExpense.category,
-        pdfUrl,
-      }
+        pdfUrl: null,
+      };
 
       if (editingItem) {
-        const oldExpense = expenses.find((exp) => exp.id === editingItem.id)
-        setExpenses(
-          expenses.map((exp) => (exp.id === editingItem.id ? { ...exp, ...expenseData, id: editingItem.id } : exp)),
-        )
-        addToHistory(
+        await editExpense(editingItem.id, expenseData, selectedExpenseFile || undefined);
+        await addToHistory(
           "Edytowano",
           "Wydatek",
-          `EXP-${editingItem.id}`,
+          editingItem.id,
           `Edytowano wydatek: ${expenseData.description}`,
-          { before: oldExpense, after: expenseData },
+          {
+            before: editingItem,
+            after: expenseData,
+          },
           user,
-        )
+        );
+        toast.success("Expense updated successfully");
       } else {
-        setExpenses([...expenses, expenseData])
-        addToHistory(
+        const newExpenseRef = await addExpense(expenseData, selectedExpenseFile || undefined);
+        if (!newExpenseRef?.id) {
+          throw new Error('Failed to create expense: No ID returned');
+        }
+        await addToHistory(
           "Dodano",
           "Wydatek",
-          `EXP-${expenseData.id}`,
+          newExpenseRef.id,
           `Dodano nowy wydatek: ${expenseData.description}`,
-          { before: null, after: expenseData },
+          {
+            after: expenseData,
+          },
           user,
-        )
+        );
+        toast.success("Expense added successfully");
       }
 
-      setIsAddExpenseOpen(false)
-      setNewExpense({ description: "", amount: "", category: "", date: "" })
-      setSelectedExpenseFile(null)
-      setEditingItem(null)
+      setIsAddExpenseOpen(false);
+      setNewExpense({ description: "", amount: "", category: "", date: "" });
+      setSelectedExpenseFile(null);
+      setEditingItem(null);
     } catch (error) {
-      console.error("Error adding expense:", error)
+      console.error("Error handling expense:", error);
+      toast.error("Failed to handle expense");
     }
-  }
+  };
 
-  const handleAddRecurring = () => {
-    const recurringData = {
-      id: recurringPayments.length + 1,
-      name: newRecurring.name,
-      amount: Number.parseFloat(newRecurring.amount),
-      frequency: newRecurring.frequency,
-      category: newRecurring.category,
-      nextPayment: newRecurring.nextPayment,
-      active: true,
+  const handleAddRecurring = async () => {
+    try {
+      // Validate required fields
+      if (!newRecurring.name.trim()) {
+        toast.error("Nazwa płatności jest wymagana");
+        return;
+      }
+      if (!newRecurring.amount || isNaN(Number(newRecurring.amount))) {
+        toast.error("Kwota musi być poprawną liczbą");
+        return;
+      }
+      if (!newRecurring.frequency) {
+        toast.error("Częstotliwość jest wymagana");
+        return;
+      }
+      if (!newRecurring.category) {
+        toast.error("Kategoria jest wymagana");
+        return;
+      }
+      if (!newRecurring.nextPayment) {
+        toast.error("Data płatności jest wymagana");
+        return;
+      }
+
+      const recurringData = {
+        name: newRecurring.name,
+        amount: Number.parseFloat(newRecurring.amount),
+        frequency: newRecurring.frequency,
+        category: newRecurring.category,
+        nextPayment: newRecurring.nextPayment,
+        active: true,
+        pdfUrl: null,
+      };
+
+      if (editingItem) {
+        await editPayment(editingItem.id, recurringData, selectedRecurringFile || undefined);
+        await addToHistory(
+          "Edytowano",
+          "Płatność cykliczna",
+          editingItem.id,
+          `Edytowano płatność cykliczną: ${recurringData.name}`,
+          {
+            before: editingItem,
+            after: recurringData,
+          },
+          user,
+        );
+        toast.success("Recurring payment updated successfully");
+      } else {
+        const newPaymentRef = await addPayment(recurringData, selectedRecurringFile || undefined);
+        if (!newPaymentRef?.id) {
+          throw new Error('Failed to create recurring payment: No ID returned');
+        }
+        await addToHistory(
+          "Dodano",
+          "Płatność cykliczna",
+          newPaymentRef.id,
+          `Dodano nową płatność cykliczną: ${recurringData.name}`,
+          {
+            after: recurringData,
+          },
+          user,
+        );
+        toast.success("Recurring payment added successfully");
+      }
+
+      setIsAddRecurringOpen(false);
+      setIsEditRecurringOpen(false);
+      setNewRecurring({ name: "", amount: "", frequency: "", category: "", nextPayment: "" });
+      setSelectedRecurringFile(null);
+      setEditingItem(null);
+    } catch (error) {
+      console.error("Error handling recurring payment:", error);
+      toast.error("Failed to handle recurring payment");
     }
+  };
 
-    if (editingItem) {
-      const oldRecurring = recurringPayments.find((rec) => rec.id === editingItem.id)
-      setRecurringPayments(
-        recurringPayments.map((rec) =>
-          rec.id === editingItem.id ? { ...rec, ...recurringData, id: editingItem.id } : rec,
-        ),
-      )
-      addToHistory(
-        "Edytowano",
-        "Płatność cykliczna",
-        `REC-${editingItem.id}`,
-        `Edytowano płatność cykliczną: ${recurringData.name}`,
-        { before: oldRecurring, after: recurringData },
-        user,
-      )
-    } else {
-      setRecurringPayments([...recurringPayments, recurringData])
-      addToHistory(
-        "Dodano",
-        "Płatność cykliczna",
-        `REC-${recurringData.id}`,
-        `Dodano nową płatność cykliczną: ${recurringData.name}`,
-        { before: null, after: recurringData },
-        user,
-      )
+  const handleAddOffer = async () => {
+    try {
+      // Validate required fields
+      if (!newOffer.title.trim()) {
+        toast.error("Tytuł oferty jest wymagany");
+        return;
+      }
+      if (!newOffer.client.trim()) {
+        toast.error("Nazwa klienta jest wymagana");
+        return;
+      }
+      if (!newOffer.amount || isNaN(Number(newOffer.amount))) {
+        toast.error("Kwota musi być poprawną liczbą");
+        return;
+      }
+      if (!newOffer.expirationDate) {
+        toast.error("Data wygaśnięcia jest wymagana");
+        return;
+      }
+
+      const offerData = {
+        title: newOffer.title,
+        client: newOffer.client,
+        amount: Number.parseFloat(newOffer.amount),
+        expirationDate: newOffer.expirationDate,
+        googleDocsUrl: newOffer.googleDocsUrl,
+        description: newOffer.description || '',
+        status: (editingItem ? editingItem.status : 'Szkic') as 'Szkic' | 'Wysłana' | 'Zaakceptowana' | 'Odrzucona',
+        createdDate: editingItem?.createdDate || new Date().toISOString().split('T')[0],
+        sentDate: editingItem?.sentDate || null
+      };
+
+      if (editingItem) {
+        await editOffer(editingItem.id, offerData);
+        await addToHistory(
+          "Edytowano",
+          "Oferta",
+          editingItem.id,
+          `Edytowano ofertę: ${offerData.title}`,
+          {
+            before: editingItem,
+            after: offerData,
+          },
+          user,
+        );
+        toast.success("Offer updated successfully");
+      } else {
+        const newOfferId = await addOffer(offerData);
+        if (!newOfferId) {
+          throw new Error('Failed to create offer: No ID returned');
+        }
+        await addToHistory(
+          "Dodano",
+          "Oferta",
+          newOfferId,
+          `Dodano nową ofertę: ${offerData.title}`,
+          {
+            after: offerData,
+          },
+          user,
+        );
+        toast.success("Offer created successfully");
+      }
+
+      setIsAddOfferOpen(false);
+      setNewOffer({ title: "", client: "", amount: "", expirationDate: "", googleDocsUrl: "", description: "" });
+      setEditingItem(null);
+    } catch (error) {
+      console.error("Error handling offer:", error);
+      toast.error("Failed to handle offer");
     }
-
-    setIsAddRecurringOpen(false)
-    setIsEditRecurringOpen(false)
-    setNewRecurring({ name: "", amount: "", frequency: "", category: "", nextPayment: "" })
-    setEditingItem(null)
-  }
-
-  const handleAddOffer = () => {
-    const offerData = {
-      id: `OF-${String(offers.length + 1).padStart(3, "0")}`,
-      title: newOffer.title,
-      client: newOffer.client,
-      amount: Number.parseFloat(newOffer.amount),
-      createdDate: new Date().toISOString().split("T")[0],
-      sentDate: null,
-      expirationDate: newOffer.expirationDate,
-      status: "Szkic",
-      googleDocsUrl: newOffer.googleDocsUrl,
-      daysToExpiration: Math.ceil(
-        (new Date(newOffer.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
-      ),
-    }
-
-    if (editingItem) {
-      const oldOffer = offers.find((off) => off.id === editingItem.id)
-      setOffers(offers.map((off) => (off.id === editingItem.id ? { ...off, ...offerData, id: editingItem.id } : off)))
-      addToHistory(
-        "Edytowano",
-        "Oferta",
-        editingItem.id,
-        `Edytowano ofertę: ${offerData.title}`,
-        { before: oldOffer, after: offerData },
-        user,
-      )
-    } else {
-      setOffers([...offers, offerData])
-      addToHistory(
-        "Dodano",
-        "Oferta",
-        offerData.id,
-        `Dodano nową ofertę: ${offerData.title}`,
-        { before: null, after: offerData },
-        user,
-      )
-    }
-
-    setIsAddOfferOpen(false)
-    setNewOffer({ title: "", client: "", amount: "", expirationDate: "", googleDocsUrl: "", description: "" })
-    setEditingItem(null)
-  }
+  };
 
   const handleEdit = (item: any, type: string) => {
-    setEditingItem({ ...item, type })
+    setEditingItem({ ...item, type });
+
+    if (type === "recurring") {
+      setNewRecurring({
+        name: item.name,
+        amount: item.amount.toString(),
+        frequency: item.frequency,
+        category: item.category,
+        nextPayment: item.nextPayment,
+      });
+      setIsPaymentDisplayOpen(false); // Close the display modal if it's open
+      setIsAddRecurringOpen(true);
+    }
 
     if (type === "invoice") {
       setNewInvoice({
@@ -896,33 +1329,6 @@ export default function FinancialDashboard() {
       })
       setIsAddOfferOpen(true)
     }
-
-    if (type === "recurring") {
-      setNewRecurring({
-        name: item.name,
-        amount: item.amount.toString(),
-        frequency: item.frequency,
-        category: item.category,
-        nextPayment: item.nextPayment,
-      })
-      setIsEditRecurringOpen(true)
-    }
-  }
-
-  const toggleRecurringStatus = (id: number) => {
-    const payment = recurringPayments.find((p) => p.id === id)
-    if (payment) {
-      const newStatus = !payment.active
-      setRecurringPayments(recurringPayments.map((p) => (p.id === id ? { ...p, active: newStatus } : p)))
-      addToHistory(
-        "Edytowano",
-        "Płatność cykliczna",
-        `REC-${id}`,
-        `${newStatus ? "Aktywowano" : "Dezaktywowano"} płatność cykliczną: ${payment.name}`,
-        { before: { active: payment.active }, after: { active: newStatus } },
-        user,
-      )
-    }
   }
 
   // Update the remindClient function
@@ -955,20 +1361,63 @@ export default function FinancialDashboard() {
     setActiveTab(tabName)
   }
 
-  const revertChange = (historyItem: any) => {
-    if (!historyItem.revertible) return
+  // Update revertChange function with proper type handling
+  const revertChange = async (historyItem: HistoryEntry) => {
+    if (!historyItem.revertible || !user?.id) return;
 
-    // Implementation for reverting changes would go here
-    console.log("Reverting change:", historyItem)
-    addToHistory(
-      "Cofnięto",
-      historyItem.type,
-      historyItem.itemId,
-      `Cofnięto zmianę: ${historyItem.description}`,
-      { reverted: historyItem.changes },
-      user,
-    )
-  }
+    try {
+      // Get the previous state from the history item
+      const previousState = historyItem.changes?.before;
+      if (!previousState) {
+        toast.error('Nie można cofnąć tej zmiany - brak poprzedniego stanu');
+        return;
+      }
+
+      // Revert based on the type of item
+      switch (historyItem.type) {
+        case 'Faktura': {
+          const invoiceData = previousState as Partial<Invoice>;
+          // Ensure status is of the correct type
+          if (invoiceData.status && !["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].includes(invoiceData.status)) {
+            toast.error('Nieprawidłowy status faktury');
+            return;
+          }
+          await editInvoice(historyItem.itemId, invoiceData);
+          break;
+        }
+        case 'Wydatek':
+          await editExpense(historyItem.itemId, previousState);
+          break;
+        case 'Płatność cykliczna':
+          await editPayment(historyItem.itemId, previousState);
+          break;
+        case 'Oferta':
+          await editOffer(historyItem.itemId, previousState);
+          break;
+        default:
+          toast.error('Nieznany typ elementu');
+          return;
+      }
+
+      // Add revert action to history
+      await addToHistory(
+        "Cofnięto",
+        historyItem.type,
+        historyItem.itemId,
+        `Cofnięto zmianę: ${historyItem.description}`,
+        {
+          before: historyItem.changes?.after,
+          after: previousState,
+        },
+        user,
+      );
+
+      toast.success('Pomyślnie cofnięto zmianę');
+    } catch (error) {
+      console.error('Error reverting change:', error);
+      toast.error('Błąd podczas cofania zmiany');
+    }
+  };
 
   const getOfferStatusColor = (status: string) => {
     switch (status) {
@@ -991,14 +1440,6 @@ export default function FinancialDashboard() {
     return "text-green-500"
   }
 
-  const LoadingSkeleton = () => (
-    <div className="space-y-4">
-      <Skeleton className="h-8 w-full" />
-      <Skeleton className="h-8 w-full" />
-      <Skeleton className="h-8 w-full" />
-    </div>
-  )
-
   // Check authentication
   if (!isLoaded) {
     return (
@@ -1011,6 +1452,166 @@ export default function FinancialDashboard() {
   if (!isSignedIn) {
     return <RedirectToSignIn />
   }
+
+  // Add handleDeleteExpense function
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      const expense = expenses.find(e => e.id === expenseId);
+      await removeExpense(expenseId);
+      await addToHistory(
+        "Usunięto",
+        "Wydatek",
+        expenseId,
+        `Usunięto wydatek: ${expense?.description}`,
+        {
+          before: expense,
+        },
+        user,
+      );
+      toast.success("Expense deleted successfully");
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      toast.error("Failed to delete expense");
+    }
+  };
+
+  // Add handleDeleteRecurring function
+  const handleDeleteRecurring = async (paymentId: string) => {
+    try {
+      const payment = recurringPayments.find(p => p.id === paymentId);
+      await removePayment(paymentId);
+      await addToHistory(
+        "Usunięto",
+        "Płatność cykliczna",
+        paymentId,
+        `Usunięto płatność cykliczną: ${payment?.name}`,
+        {
+          before: payment,
+        },
+        user,
+      );
+      toast.success("Recurring payment deleted successfully");
+    } catch (error) {
+      console.error("Error deleting recurring payment:", error);
+      toast.error("Failed to delete recurring payment");
+    }
+  };
+
+  // Add handleToggleRecurring function
+  const handleToggleRecurring = async (paymentId: string, active: boolean) => {
+    try {
+      const payment = recurringPayments.find(p => p.id === paymentId);
+      await togglePaymentStatus(paymentId, active);
+      await addToHistory(
+        "Edytowano",
+        "Płatność cykliczna",
+        paymentId,
+        `${active ? 'Aktywowano' : 'Dezaktywowano'} płatność cykliczną: ${payment?.name}`,
+        {
+          before: { active: !active },
+          after: { active },
+        },
+        user,
+      );
+      toast.success(`Recurring payment ${active ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error("Error toggling recurring payment:", error);
+      toast.error("Failed to toggle recurring payment status");
+    }
+  };
+
+  // Update the filtered payments to use the new type
+  const filteredRecurringPayments = recurringPayments.filter(payment => {
+    const matchesSearch = payment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || payment.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Add handlePaymentDisplay function before the return statement
+  const handlePaymentDisplay = (payment: RecurringPayment) => {
+    setSelectedPayment(payment);
+    setIsPaymentDisplayOpen(true);
+  };
+
+  // Add handleDeleteOffer function
+  const handleDeleteOffer = async (offerId: string) => {
+    try {
+      const offer = offers.find(o => o.id === offerId);
+      await removeOffer(offerId);
+      await addToHistory(
+        "Usunięto",
+        "Oferta",
+        offerId,
+        `Usunięto ofertę: ${offer?.title}`,
+        {
+          before: offer,
+        },
+        user,
+      );
+      toast.success("Offer deleted successfully");
+    } catch (error) {
+      console.error("Error deleting offer:", error);
+      toast.error("Failed to delete offer");
+    }
+  };
+
+  // Add handleOfferStatusChange function
+  const handleOfferStatusChange = async (offerId: string, newStatus: 'Szkic' | 'Wysłana' | 'Zaakceptowana' | 'Odrzucona') => {
+    try {
+      const offer = offers.find(o => o.id === offerId);
+      await changeOfferStatus(offerId, newStatus);
+      await addToHistory(
+        "Edytowano",
+        "Oferta",
+        offerId,
+        `Zmieniono status oferty ${offer?.title} na ${newStatus}`,
+        {
+          before: { status: offer?.status },
+          after: { status: newStatus },
+        },
+        user,
+      );
+      toast.success("Status updated successfully");
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    }
+  };
+
+  // Update addToHistory function to use the new service
+  const addToHistory = async (
+    action: string,
+    type: string,
+    itemId: string,
+    description: string,
+    changes: any = null,
+    currentUser: any,
+  ) => {
+    if (!user?.id) return;
+
+    try {
+      const historyEntry = {
+        timestamp: new Date().toLocaleString("pl-PL"),
+        user: {
+          name: currentUser?.fullName || "System",
+          email: currentUser?.email || "system@app.com",
+        },
+        action,
+        type,
+        itemId,
+        description,
+        changes,
+        revertible: action !== "Wysłano przypomnienie",
+      };
+
+      const newEntry = await addHistoryEntry(user.id, historyEntry);
+      setHistoryEntries((prev: HistoryEntry[]) => [newEntry, ...prev]);
+    } catch (error) {
+      console.error('Error adding history entry:', error);
+      toast.error('Błąd podczas zapisywania historii');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -1107,7 +1708,7 @@ export default function FinancialDashboard() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Całkowity przychód</CardTitle>
+                  <CardTitle className="text-sm font-medium">Przychód</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -1116,26 +1717,17 @@ export default function FinancialDashboard() {
                   ) : (
                     <div className="text-2xl font-bold">{totalRevenue.toLocaleString()} zł</div>
                   )}
-                  <p className="text-xs text-muted-foreground">+12.5% od zeszłego miesiąca</p>
+                  <p className={cn(
+                    "text-xs",
+                    revenueChange > 0 ? "text-green-600" : revenueChange < 0 ? "text-red-600" : "text-muted-foreground"
+                  )}>
+                    {formatPercentageChange(revenueChange)}
+                  </p>
                 </CardContent>
               </Card>
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Całkowite wydatki</CardTitle>
-                  <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    <div className="text-2xl font-bold">{totalExpenses.toLocaleString()} zł</div>
-                  )}
-                  <p className="text-xs text-muted-foreground">+2.1% od zeszłego miesiąca</p>
-                </CardContent>
-              </Card>
-              <Card className="transition-all duration-200 hover:shadow-md">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Zysk netto</CardTitle>
+                  <CardTitle className="text-sm font-medium">Dochód</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -1144,21 +1736,59 @@ export default function FinancialDashboard() {
                   ) : (
                     <div className="text-2xl font-bold">{netProfit.toLocaleString()} zł</div>
                   )}
-                  <p className="text-xs text-muted-foreground">+18.2% od zeszłego miesiąca</p>
+                  <p className={cn(
+                    "text-xs",
+                    incomeChange > 0 ? "text-green-600" : incomeChange < 0 ? "text-red-600" : "text-muted-foreground"
+                  )}>
+                    {formatPercentageChange(incomeChange)}
+                  </p>
                 </CardContent>
               </Card>
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">VAT do zapłaty</CardTitle>
+                  <CardTitle className="text-sm font-medium">Wydatki</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold">{totalExpenses.toLocaleString()} zł</div>
+                      <div className="flex flex-row gap-2">
+                        <p className={cn(
+                          "text-xs",
+                          expensesChange > 0 ? "text-red-600" : expensesChange < 0 ? "text-green-600" : "text-muted-foreground"
+                        )}>
+                          {formatPercentageChange(expensesChange)} 
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Cykliczne: {monthlyRecurring.toLocaleString()} zł
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="transition-all duration-200 hover:shadow-md">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">VAT</CardTitle>
                   <CalendarDays className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold">{totalTax.toLocaleString()} zł</div>
+                    <>
+                      <div className="text-2xl font-bold">{totalVat.toLocaleString()} zł</div>
+                      <p className={cn(
+                        "text-xs",
+                        vatChange > 0 ? "text-red-600" : vatChange < 0 ? "text-green-600" : "text-muted-foreground"
+                      )}>
+                        {formatPercentageChange(vatChange)}
+                      </p>
+                    </>
                   )}
-                  <p className="text-xs text-muted-foreground">Zgodnie określoną stawką VAT</p>
                 </CardContent>
               </Card>
             </div>
@@ -1243,18 +1873,21 @@ export default function FinancialDashboard() {
                     <LoadingSkeleton />
                   ) : (
                     <div className="space-y-2">
-                      {expenses.slice(0, 3).map((expense) => (
-                        <div key={expense.id} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{expense.description}</p>
-                            <p className="text-sm text-muted-foreground">{expense.date}</p>
+                      {expenses.slice(0, 3).map((expense, index) => (
+                        <div key={expense.id}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{expense.description}</p>
+                              <p className="text-sm text-muted-foreground">{expense.date}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">{expense.amount.toLocaleString()} zł</p>
+                              <Badge variant="outline" className="text-xs">
+                                {expense.category}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-medium">{expense.amount.toLocaleString()} zł</p>
-                            <Badge variant="outline" className="text-xs">
-                              {expense.category}
-                            </Badge>
-                          </div>
+                          {index < 2 && <Separator className="mt-3" />}
                         </div>
                       ))}
                     </div>
@@ -1275,7 +1908,6 @@ export default function FinancialDashboard() {
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
-                  <CardDescription>Miesięczne koszty: {monthlyRecurring.toLocaleString()} zł</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
@@ -1299,7 +1931,7 @@ export default function FinancialDashboard() {
                                 </Badge>
                               </div>
                             </div>
-                            {index < 2 && <Separator className="mt-3" />}
+                            {index < 2 && <Separator className="my-3" />}
                           </div>
                         ))}
                     </div>
@@ -1604,9 +2236,10 @@ export default function FinancialDashboard() {
                   placeholder="Szukaj wydatku..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-[350px]"
                 />
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[250px]">
                     <SelectValue placeholder="Filtruj kategorię" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1626,91 +2259,96 @@ export default function FinancialDashboard() {
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>{editingItem ? "Edytuj wydatek" : "Dodaj nowy wydatek"}</DialogTitle>
-                      <DialogDescription>Wprowadź szczegóły wydatku i opcjonalnie prześlij PDF</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="date">Data wydatku</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={newExpense.date}
-                          onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="description">Opis</Label>
-                        <Input
-                          id="description"
-                          placeholder="Opis wydatku"
-                          value={newExpense.description}
-                          onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="amount">Kwota (zł)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          placeholder="0.00"
-                          value={newExpense.amount}
-                          onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="category">Kategoria</Label>
-                        <Select
-                          value={newExpense.category}
-                          onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Wybierz kategorię" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Operacyjne">Operacyjne</SelectItem>
-                            <SelectItem value="Marketing">Marketing</SelectItem>
-                            <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
-                            <SelectItem value="Sprzęt">Sprzęt</SelectItem>
-                            <SelectItem value="Podróże">Podróże</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Separator />
-                      <div className="grid gap-2">
-                        <Label htmlFor="expense-pdf">PDF wydatku (opcjonalnie)</Label>
-                        <Input
-                          id="expense-pdf"
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => setSelectedExpenseFile(e.target.files?.[0] || null)}
-                        />
-                        {selectedExpenseFile && (
-                          <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
-                            <div>
-                              <p>Wybrany plik: {selectedExpenseFile.name}</p>
-                              <p className="text-muted-foreground">
-                                Rozmiar: {(selectedExpenseFile.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddExpense();
+                    }}>
+                      <DialogHeader>
+                        <DialogTitle>{editingItem ? "Edytuj wydatek" : "Dodaj nowy wydatek"}</DialogTitle>
+                        <DialogDescription>Wprowadź szczegóły wydatku i opcjonalnie prześlij PDF</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="date">Data wydatku</Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            value={newExpense.date}
+                            onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="description">Opis</Label>
+                          <Input
+                            id="description"
+                            placeholder="Opis wydatku"
+                            value={newExpense.description}
+                            onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="amount">Kwota (zł)</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            placeholder="0.00"
+                            value={newExpense.amount}
+                            onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="category">Kategoria</Label>
+                          <Select
+                            value={newExpense.category}
+                            onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Wybierz kategorię" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Operacyjne">Operacyjne</SelectItem>
+                              <SelectItem value="Marketing">Marketing</SelectItem>
+                              <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
+                              <SelectItem value="Sprzęt">Sprzęt</SelectItem>
+                              <SelectItem value="Podróże">Podróże</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Separator />
+                        <div className="grid gap-2">
+                          <Label htmlFor="expense-pdf">PDF wydatku (opcjonalnie)</Label>
+                          <Input
+                            id="expense-pdf"
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => setSelectedExpenseFile(e.target.files?.[0] || null)}
+                          />
+                          {selectedExpenseFile && (
+                            <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
+                              <div>
+                                <p>Wybrany plik: {selectedExpenseFile.name}</p>
+                                <p className="text-muted-foreground">
+                                  Rozmiar: {(selectedExpenseFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedExpenseFile(null)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedExpenseFile(null)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleAddExpense} className="transition-all duration-200 hover:scale-105">
-                        {editingItem ? "Zapisz zmiany" : "Dodaj wydatek"}
-                      </Button>
-                    </DialogFooter>
+                      <DialogFooter>
+                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                          {editingItem ? "Zapisz zmiany" : "Dodaj wydatek"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -1728,7 +2366,15 @@ export default function FinancialDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.map((expense) => (
+                {isLoadingExpenses ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredExpenses.map((expense) => (
                   <TableRow key={expense.id} className="transition-all duration-200 hover:bg-muted/50">
                     <TableCell className="font-medium">{expense.date}</TableCell>
                     <TableCell>{expense.description}</TableCell>
@@ -1752,6 +2398,14 @@ export default function FinancialDashboard() {
                           className="transition-all duration-200 hover:scale-105"
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteExpense(expense.id)}
+                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -1865,7 +2519,15 @@ export default function FinancialDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOffers.map((offer) => (
+                {isLoadingOffers ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredOffers.map((offer) => (
                   <TableRow key={offer.id} className="transition-all duration-200 hover:bg-muted/50">
                     <TableCell className="font-medium">{offer.title}</TableCell>
                     <TableCell>{offer.client}</TableCell>
@@ -1875,7 +2537,31 @@ export default function FinancialDashboard() {
                       <span className={getExpirationColor(offer.daysToExpiration)}>{offer.daysToExpiration} dni</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getOfferStatusColor(offer.status)}>{offer.status}</Badge>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Badge
+                            variant={getOfferStatusColor(offer.status)}
+                            className="cursor-pointer hover:opacity-80"
+                          >
+                            {offer.status}
+                          </Badge>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-2 grid gap-1">
+                          {(['Szkic', 'Wysłana', 'Zaakceptowana', 'Odrzucona'] as const).map((status) => (
+                            <Badge
+                              key={status}
+                              variant={getOfferStatusColor(status)}
+                              className={cn(
+                                "cursor-pointer hover:opacity-80 justify-center",
+                                status === offer.status && "opacity-50 pointer-events-none"
+                              )}
+                              onClick={() => handleOfferStatusChange(offer.id, status)}
+                            >
+                              {status}
+                            </Badge>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -1886,6 +2572,14 @@ export default function FinancialDashboard() {
                           className="transition-all duration-200 hover:scale-105"
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteOffer(offer.id)}
+                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -1899,87 +2593,143 @@ export default function FinancialDashboard() {
           <TabsContent value="recurring" className="space-y-6 animate-in fade-in-50 duration-500">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Płatności cykliczne</h2>
-              <Dialog open={isAddRecurringOpen} onOpenChange={setIsAddRecurringOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="transition-all duration-200 hover:scale-105">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Dodaj płatność
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>{editingItem ? "Edytuj płatność" : "Dodaj nową płatność"}</DialogTitle>
-                    <DialogDescription>Wprowadź szczegóły płatności cyklicznej</DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Nazwa płatności</Label>
-                      <Input
-                        id="name"
-                        placeholder="Nazwa usługi/produktu"
-                        value={newRecurring.name}
-                        onChange={(e) => setNewRecurring({ ...newRecurring, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="amount">Kwota (zł)</Label>
-                      <Input
-                        id="amount"
-                        type="number"
-                        placeholder="0.00"
-                        value={newRecurring.amount}
-                        onChange={(e) => setNewRecurring({ ...newRecurring, amount: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="frequency">Częstotliwość</Label>
-                      <Select
-                        value={newRecurring.frequency}
-                        onValueChange={(value) => setNewRecurring({ ...newRecurring, frequency: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Wybierz częstotliwość" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Miesięcznie">Miesięcznie</SelectItem>
-                          <SelectItem value="Kwartalnie">Kwartalnie</SelectItem>
-                          <SelectItem value="Rocznie">Rocznie</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="category">Kategoria</Label>
-                      <Select
-                        value={newRecurring.category}
-                        onValueChange={(value) => setNewRecurring({ ...newRecurring, category: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Wybierz kategorię" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
-                          <SelectItem value="Operacyjne">Operacyjne</SelectItem>
-                          <SelectItem value="Ubezpieczenia">Ubezpieczenia</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="nextPayment">Następna płatność</Label>
-                      <Input
-                        id="nextPayment"
-                        type="date"
-                        value={newRecurring.nextPayment}
-                        onChange={(e) => setNewRecurring({ ...newRecurring, nextPayment: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleAddRecurring} className="transition-all duration-200 hover:scale-105">
-                      {editingItem ? "Zapisz zmiany" : "Dodaj płatność"}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="search"
+                  placeholder="Szukaj płatności..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-[350px]"
+                />
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[250px]">
+                    <SelectValue placeholder="Filtruj kategorię" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Wszystkie kategorie</SelectItem>
+                    <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
+                    <SelectItem value="Operacyjne">Operacyjne</SelectItem>
+                    <SelectItem value="Ubezpieczenia">Ubezpieczenia</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Dialog open={isAddRecurringOpen} onOpenChange={setIsAddRecurringOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="transition-all duration-200 hover:scale-105">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Dodaj płatność
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddRecurring();
+                    }}>
+                      <DialogHeader>
+                        <DialogTitle>{editingItem ? "Edytuj płatność" : "Dodaj nową płatność"}</DialogTitle>
+                        <DialogDescription>Wprowadź szczegóły płatności cyklicznej</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="name">Nazwa płatności</Label>
+                          <Input
+                            id="name"
+                            placeholder="Nazwa usługi/produktu"
+                            value={newRecurring.name}
+                            onChange={(e) => setNewRecurring({ ...newRecurring, name: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="amount">Kwota (zł)</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            placeholder="0.00"
+                            value={newRecurring.amount}
+                            onChange={(e) => setNewRecurring({ ...newRecurring, amount: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="frequency">Częstotliwość</Label>
+                          <Select
+                            value={newRecurring.frequency}
+                            onValueChange={(value) => setNewRecurring({ ...newRecurring, frequency: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Wybierz częstotliwość" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Miesięcznie">Miesięcznie</SelectItem>
+                              <SelectItem value="Kwartalnie">Kwartalnie</SelectItem>
+                              <SelectItem value="Rocznie">Rocznie</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="category">Kategoria</Label>
+                          <Select
+                            value={newRecurring.category}
+                            onValueChange={(value) => setNewRecurring({ ...newRecurring, category: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Wybierz kategorię" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
+                              <SelectItem value="Operacyjne">Operacyjne</SelectItem>
+                              <SelectItem value="Ubezpieczenia">Ubezpieczenia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="nextPayment">Data płatności</Label>
+                          <Input
+                            id="nextPayment"
+                            type="date"
+                            value={newRecurring.nextPayment}
+                            onChange={(e) => setNewRecurring({ ...newRecurring, nextPayment: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Data może być z przeszłości lub przyszłości. System automatycznie obliczy następną płatność.
+                          </p>
+                        </div>
+                        <Separator />
+                        <div className="grid gap-2">
+                          <Label htmlFor="recurring-pdf">PDF dokumentu (opcjonalnie)</Label>
+                          <Input
+                            id="recurring-pdf"
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => setSelectedRecurringFile(e.target.files?.[0] || null)}
+                          />
+                          {selectedRecurringFile && (
+                            <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
+                              <div>
+                                <p>Wybrany plik: {selectedRecurringFile.name}</p>
+                                <p className="text-muted-foreground">
+                                  Rozmiar: {(selectedRecurringFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedRecurringFile(null)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                          {editingItem ? "Zapisz zmiany" : "Dodaj płatność"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
             <Table>
@@ -1990,22 +2740,56 @@ export default function FinancialDashboard() {
                   <TableHead>Częstotliwość</TableHead>
                   <TableHead>Kategoria</TableHead>
                   <TableHead>Następna płatność</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>PDF</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead>Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recurringPayments.map((payment) => (
+                {isLoadingRecurringPayments ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-4">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredRecurringPayments.map((payment) => (
                   <TableRow key={payment.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">{payment.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto font-medium"
+                        onClick={() => handlePaymentDisplay(payment)}
+                      >
+                        {payment.name}
+                      </Button>
+                    </TableCell>
                     <TableCell>{payment.amount.toLocaleString()} zł</TableCell>
                     <TableCell>{payment.frequency}</TableCell>
                     <TableCell>{payment.category}</TableCell>
-                    <TableCell>{payment.nextPayment}</TableCell>
                     <TableCell>
-                      <Badge variant={payment.active ? "default" : "secondary"}>
-                        {payment.active ? "Aktywna" : "Nieaktywna"}
-                      </Badge>
+                      {calculateNextPaymentDate(payment.nextPayment, payment.frequency)}
+                    </TableCell>
+                    <TableCell>
+                      {payment.pdfUrl ? (
+                        <Button variant="ghost" size="sm" onClick={() => openPdfModal(payment.pdfUrl!)}>
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Brak</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={payment.active}
+                          onCheckedChange={(checked) => handleToggleRecurring(payment.id, checked)}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {payment.active ? "Aktywna" : "Nieaktywna"}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -2020,10 +2804,10 @@ export default function FinancialDashboard() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleRecurringStatus(payment.id)}
-                          className="transition-all duration-200 hover:scale-105"
+                          onClick={() => handleDeleteRecurring(payment.id)}
+                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
                         >
-                          {payment.active ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -2031,6 +2815,100 @@ export default function FinancialDashboard() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Add Payment Display Dialog */}
+            <Dialog open={isPaymentDisplayOpen} onOpenChange={setIsPaymentDisplayOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Szczegóły płatności cyklicznej</DialogTitle>
+                  <DialogDescription>Informacje o płatności i historia zmian</DialogDescription>
+                </DialogHeader>
+                {selectedPayment && (
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <div className="flex justify-between items-center">
+                        <Label>Status</Label>
+                        <Switch
+                          checked={selectedPayment.active}
+                          onCheckedChange={(checked) => {
+                            handleToggleRecurring(selectedPayment.id, checked);
+                            setSelectedPayment(prev => prev ? { ...prev, active: checked } : null);
+                          }}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Nazwa</Label>
+                          <p className="font-medium">{selectedPayment.name}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Kwota</Label>
+                          <p className="font-medium">{selectedPayment.amount.toLocaleString()} zł</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Częstotliwość</Label>
+                          <p className="font-medium">{selectedPayment.frequency}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Kategoria</Label>
+                          <p className="font-medium">{selectedPayment.category}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Następna płatność</Label>
+                        <p className="font-medium">{selectedPayment.nextPayment}</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Następna płatność: {calculateNextPaymentDate(selectedPayment.nextPayment, selectedPayment.frequency)}
+                      </p>
+                      {selectedPayment.pdfUrl && (
+                        <div>
+                          <Label className="text-muted-foreground">Dokument PDF</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPdfModal(selectedPayment.pdfUrl!)}
+                              className="w-full"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Otwórz PDF
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <Separator />
+                      <div>
+                        <Label className="text-muted-foreground">Data utworzenia</Label>
+                        <p className="font-medium">{new Date(selectedPayment.createdAt).toLocaleDateString('pl-PL')}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleEdit(selectedPayment, "recurring")}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edytuj
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      handleDeleteRecurring(selectedPayment!.id);
+                      setIsPaymentDisplayOpen(false);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Usuń
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Historia */}
@@ -2057,58 +2935,38 @@ export default function FinancialDashboard() {
                 <CardDescription>Wszystkie zmiany w systemie z możliwością cofnięcia</CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {isHistoryLoading ? (
                   <LoadingSkeleton />
                 ) : (
                   <div className="space-y-4">
-                    {historyLog
+                    {historyEntries
                       .filter((item) => historyFilter === "all" || item.type === historyFilter)
                       .map((item, index) => (
                         <div key={item.id}>
-                          <div className="flex items-start justify-between p-4 rounded-lg border transition-all duration-200 hover:bg-muted/50">
-                            <div className="flex items-start gap-3">
-                              <img
-                                className="h-8 w-8 rounded-full object-cover border"
-                                src={item.user?.imageUrl || "/placeholder.svg?height=32&width=32"}
-                                alt={item.user?.fullName || item.user?.name || "User"}
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge
-                                    variant={
-                                      item.action === "Dodano"
-                                        ? "default"
-                                        : item.action === "Edytowano"
-                                          ? "secondary"
-                                          : item.action === "Usunięto"
-                                            ? "destructive"
-                                            : "outline"
-                                    }
-                                  >
-                                    {item.action}
-                                  </Badge>
-                                  <Badge variant="outline">{item.type}</Badge>
-                                  <span className="text-sm text-muted-foreground">{item.itemId}</span>
-                                </div>
-                                <p className="text-sm font-medium">{item.description}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {item.user?.fullName || item.user?.name || "Użytkownik"} • {item.timestamp}
-                                </p>
-                                {item.changes && (
-                                  <div className="mt-2 text-xs">
-                                    {item.changes.before && (
-                                      <div className="text-red-600">
-                                        Przed: {JSON.stringify(item.changes.before, null, 2)}
-                                      </div>
-                                    )}
-                                    {item.changes.after && (
-                                      <div className="text-green-600">
-                                        Po: {JSON.stringify(item.changes.after, null, 2)}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{item.timestamp}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span>{item.user.name}</span>
                               </div>
+                              <div className="mt-1">
+                                <span className="text-muted-foreground">{item.description}</span>
+                              </div>
+                              {item.changes && (
+                                <div className="mt-2 text-xs">
+                                  {item.changes.before && (
+                                    <div className="text-red-600">
+                                      Przed: {JSON.stringify(item.changes.before, null, 2)}
+                                    </div>
+                                  )}
+                                  {item.changes.after && (
+                                    <div className="text-green-600">
+                                      Po: {JSON.stringify(item.changes.after, null, 2)}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div className="flex gap-2">
                               {item.revertible && (
@@ -2124,10 +2982,10 @@ export default function FinancialDashboard() {
                               )}
                             </div>
                           </div>
-                          {index < historyLog.length - 1 && <Separator className="my-4" />}
+                          {index < historyEntries.length - 1 && <Separator className="my-4" />}
                         </div>
                       ))}
-                    {historyLog.length === 0 && (
+                    {!isHistoryLoading && historyEntries.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         Brak zmian w historii. Rozpocznij pracę, aby zobaczyć log aktywności.
                       </div>
@@ -2152,10 +3010,10 @@ export default function FinancialDashboard() {
               <img
                 className="h-16 w-16 rounded-full object-cover border-2 border-border"
                 src={user?.imageUrl || "/placeholder.svg?height=64&width=64"}
-                alt={user?.fullName || "User"}
+                alt={user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
               />
               <div>
-                <h3 className="font-medium">{user?.fullName}</h3>
+                <h3 className="font-medium">{user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}</h3>
                 <p className="text-sm text-muted-foreground">Administrator</p>
               </div>
             </div>
@@ -2205,7 +3063,7 @@ export default function FinancialDashboard() {
             </div>
             <div className="grid gap-2">
               <Label>Imię i nazwisko</Label>
-              <Input value={user?.fullName || ""} disabled />
+              <Input value={user?.firstName ? `${user.firstName} ${user.lastName}` : ""} disabled />
             </div>
             <div className="grid gap-2">
               <Label>Data utworzenia konta</Label>
@@ -2248,7 +3106,7 @@ export default function FinancialDashboard() {
       )}
 
       {/* Add this before the final closing tag */}
-      <Dialog open={reminderConfirmation.isOpen} onOpenChange={(isOpen) => 
+      <Dialog open={reminderConfirmation.isOpen} onOpenChange={(isOpen) =>
         setReminderConfirmation(prev => ({ ...prev, isOpen }))
       }>
         <DialogContent>

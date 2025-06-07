@@ -91,6 +91,29 @@ export async function getInvoice(userId: string, invoiceId: string): Promise<Inv
 // Create a new invoice
 export async function createInvoice(userId: string, invoice: Omit<Invoice, 'id'>, pdfFile?: File): Promise<Invoice> {
   try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // Validate required fields
+    if (!invoice.client || !invoice.amount || !invoice.dueDate || !invoice.vatRate || 
+        !invoice.representativeName || !invoice.representativeEmail) {
+      throw new Error('Missing required fields');
+    }
+
+    // Validate numeric fields
+    if (isNaN(Number(invoice.amount)) || Number(invoice.amount) <= 0) {
+      throw new Error('Invalid amount');
+    }
+    if (isNaN(Number(invoice.vatRate)) || Number(invoice.vatRate) < 0) {
+      throw new Error('Invalid VAT rate');
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoice.representativeEmail)) {
+      throw new Error('Invalid email format');
+    }
+
     console.log('Creating invoice for user:', userId);
     
     // Only generate invoice number if not provided
