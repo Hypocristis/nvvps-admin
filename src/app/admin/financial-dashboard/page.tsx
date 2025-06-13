@@ -150,94 +150,6 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-// Add utility function to calculate recurring payment occurrences
-// function calculateRecurringPaymentAmount(payment: RecurringPayment, targetDate: Date): number {
-//   console.log('=== Start payment calculation ===');
-//   console.log('Payment:', payment);
-//   console.log('Target date:', targetDate);
-
-//   if (!payment.active) {
-//     console.log('Payment is inactive');
-//     return 0;
-//   }
-
-//   const startDate = new Date(payment.createdAt);
-//   const paymentDate = new Date(payment.nextPayment);
-//   const currentDate = new Date(targetDate);
-
-//   console.log('Initial dates:');
-//   console.log('- Start date:', startDate.toISOString());
-//   console.log('- Payment date:', paymentDate.toISOString());
-//   console.log('- Current date:', currentDate.toISOString());
-
-//   // If the payment hasn't started yet
-//   if (currentDate < startDate) {
-//     console.log('Payment has not started yet');
-//     return 0;
-//   }
-
-//   // For the current month check, we only care about the day of the month
-//   const currentDay = currentDate.getDate();
-//   const paymentDay = paymentDate.getDate();
-
-//   // If we're checking the current month and the payment day hasn't passed yet
-//   if (currentDate.getFullYear() === targetDate.getFullYear() && 
-//       currentDate.getMonth() === targetDate.getMonth() && 
-//       currentDay < paymentDay) {
-//     console.log('Payment day has not passed in current month');
-//     console.log(`Current day: ${currentDay}, Payment day: ${paymentDay}`);
-//     return 0;
-//   }
-
-//   let amount = 0;
-//   console.log('Checking frequency:', payment.frequency);
-
-//   switch (payment.frequency) {
-//     case 'Miesięcznie':
-//       // For monthly payments, always include if the payment day has passed
-//       amount = payment.amount;
-//       console.log('Monthly payment amount:', amount);
-//       break;
-
-//     case 'Kwartalnie':
-//       // For quarterly payments, check if this is a payment month
-//       const monthsSinceStart = (currentDate.getFullYear() - startDate.getFullYear()) * 12 
-//                               + (currentDate.getMonth() - startDate.getMonth());
-//       const isQuarterlyPaymentMonth = monthsSinceStart % 3 === 0;
-//       amount = isQuarterlyPaymentMonth ? payment.amount : 0;
-//       console.log('Quarterly payment check:');
-//       console.log('- Months since start:', monthsSinceStart);
-//       console.log('- Is payment month:', isQuarterlyPaymentMonth);
-//       console.log('- Amount:', amount);
-//       break;
-
-//     case 'Rocznie':
-//       // For yearly payments, check if this is the same month as the start date
-//       const isYearlyPaymentMonth = currentDate.getMonth() === startDate.getMonth();
-//       amount = isYearlyPaymentMonth ? payment.amount : 0;
-//       console.log('Yearly payment check:');
-//       console.log('- Current month:', currentDate.getMonth());
-//       console.log('- Start month:', startDate.getMonth());
-//       console.log('- Is payment month:', isYearlyPaymentMonth);
-//       console.log('- Amount:', amount);
-//       break;
-
-//     default:
-//       console.log('Unknown frequency:', payment.frequency);
-//       amount = 0;
-//   }
-
-//   console.log('Final amount:', amount);
-//   console.log('=== End payment calculation ===');
-//   return amount;
-// }
-
-// function calculateTotalRecurringForMonth(payments: RecurringPayment[], targetDate: Date): number {
-//   return payments
-//     .filter(p => p.active)
-//     .reduce((sum, payment) => sum + calculateRecurringPaymentAmount(payment, targetDate), 0);
-// }
-
 // Add function to calculate accumulated recurring payments
 function calculateAccumulatedRecurringPayments(payments: RecurringPayment[], endDate: Date): number {
   let total = 0;
@@ -556,25 +468,6 @@ const addToHistory = useCallback(
   if (!isSignedIn) {
     return <RedirectToSignIn />
   }
-
-  // Google Drive API integration
-  // const uploadToGoogleDrive = async (file: File, fileName: string) => {
-  //   try {
-  //     // Mock Google Drive API call
-  //     console.log(`Uploading ${fileName} to Google Drive...`)
-
-  //     // Simulate API call
-  //     await new Promise((resolve) => setTimeout(resolve, 2000))
-
-  //     const mockDriveUrl = `https://drive.google.com/file/${Math.random().toString(36).substr(2, 9)}`
-  //     console.log(`File uploaded successfully: ${mockDriveUrl}`)
-
-  //     return mockDriveUrl
-  //   } catch (error) {
-  //     console.error("Error uploading to Google Drive:", error)
-  //     throw error
-  //   }
-  // }
 
   // Email API integration
   const sendReminderEmail = async (invoice: Invoice) => {
