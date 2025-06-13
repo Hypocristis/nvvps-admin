@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   CalendarDays,
   DollarSign,
@@ -103,14 +103,14 @@ const calculateNextPaymentDate = (paymentDate: string, frequency: string): strin
   const currentDate = new Date();
   const baseDate = new Date(paymentDate);
   const paymentDay = baseDate.getDate();
-  
+
   let nextDate = new Date(baseDate);
-  
+
   // If the payment date has passed, calculate the next occurrence
   if (nextDate < currentDate) {
     nextDate = new Date(currentDate);
     nextDate.setDate(paymentDay); // Keep the same day of month
-    
+
     // If we've already passed this month's date, move to next period
     if (nextDate < currentDate) {
       switch (frequency) {
@@ -126,7 +126,7 @@ const calculateNextPaymentDate = (paymentDate: string, frequency: string): strin
       }
     }
   }
-  
+
   return nextDate.toISOString().split('T')[0];
 };
 
@@ -231,56 +231,56 @@ const LoadingSkeleton = () => (
 function calculateAccumulatedRecurringPayments(payments: RecurringPayment[], endDate: Date): number {
   let total = 0;
   const currentDate = new Date(endDate);
-  
+
   payments.filter(p => p.active).forEach(payment => {
     const startDate = new Date(payment.nextPayment); // Changed from createdAt to nextPayment
-    
+
     console.log(`\nCalculating accumulated payments for: ${payment.name}`);
     console.log(`Payment date: ${startDate.toISOString().split('T')[0]}`);
     console.log(`Current date: ${currentDate.toISOString().split('T')[0]}`);
     console.log(`Amount: ${payment.amount}`);
     console.log(`Frequency: ${payment.frequency}`);
-    
+
     // Calculate full months between start date and current date
     const startYear = startDate.getFullYear();
     const startMonth = startDate.getMonth();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
-    
+
     // Calculate months difference (0-based)
     let monthsDiff = (currentYear - startYear) * 12 + (currentMonth - startMonth);
-    
+
     // If we're past the payment day in the current month, include this month
     if (currentDate.getDate() >= startDate.getDate()) {
       monthsDiff += 1;
     }
-    
+
     console.log(`Months difference: ${monthsDiff}`);
-    
+
     let paymentTotal = 0;
     switch (payment.frequency) {
       case 'Miesięcznie':
         paymentTotal = payment.amount * monthsDiff;
         break;
-        
+
       case 'Kwartalnie':
         // Calculate complete quarters
         const quarters = Math.floor(monthsDiff / 3);
         paymentTotal = payment.amount * quarters;
         break;
-        
+
       case 'Rocznie':
         // Calculate complete years
         const years = Math.floor(monthsDiff / 12);
         paymentTotal = payment.amount * years;
         break;
     }
-    
+
     console.log(`Number of payments: ${monthsDiff}`);
     console.log(`Total for this payment: ${paymentTotal}`);
     total += paymentTotal;
   });
-  
+
   console.log(`\nTotal accumulated recurring payments: ${total}`);
   return total;
 }
@@ -436,40 +436,82 @@ export default function FinancialDashboard() {
   const [isPaymentDisplayOpen, setIsPaymentDisplayOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | null>(null);
 
+type MinimalUser = {
+  fullName?: string | null
+  email?: string | null
+}
+
+const addToHistory = useCallback(
+  async (
+    action: string,
+    type: string,
+    itemId: string,
+    description: string,
+    changes: Record<string, unknown> | null = null,
+    currentUser: MinimalUser
+  ) => {
+    if (!user?.id) return
+
+    try {
+      const historyEntry = {
+        timestamp: new Date().toLocaleString("pl-PL"),
+        user: {
+          name: currentUser?.fullName || "System",
+          email: currentUser?.email || "system@app.com",
+        },
+        action,
+        type,
+        itemId,
+        description,
+        changes,
+        revertible: action !== "Wysłano przypomnienie",
+      }
+
+      const newEntry = await addHistoryEntry(user.id, historyEntry)
+      setHistoryEntries((prev: HistoryEntry[]) => [newEntry, ...prev])
+    } catch (error) {
+      console.error("Error adding history entry:", error)
+      toast.error("Błąd podczas zapisywania historii")
+    }
+  },
+  [user, setHistoryEntries]
+)
+
   // Add function to check and update overdue invoices
-  const updateOverdueInvoices = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time part for accurate date comparison
+  const updateOverdueInvoices = useCallback(() => {
+  if (!user) return; // ✅ Prevent undefined/null from being passed
 
-    const updatedInvoices = invoices.map(invoice => {
-      const dueDate = new Date(invoice.dueDate)
-      dueDate.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-      // If due date has passed and invoice is not paid, mark as overdue
-      if (dueDate < today && invoice.status !== "Zapłacona") {
-        if (invoice.status !== "Przeterminowana") {
-          // Only add to history if status is actually changing
-          addToHistory(
-            "Edytowano",
-            "Faktura",
-            invoice.id,
-            `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
-            { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
-            user,
-          )
-        }
-        return { ...invoice, status: "Przeterminowana" as const }
+  const updatedInvoices = invoices.map((invoice) => {
+    const dueDate = new Date(invoice.dueDate)
+    dueDate.setHours(0, 0, 0, 0)
+
+    if (dueDate < today && invoice.status !== "Zapłacona") {
+      if (invoice.status !== "Przeterminowana") {
+        addToHistory(
+          "Edytowano",
+          "Faktura",
+          invoice.id,
+          `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
+          { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
+          user
+        )
       }
-      return invoice
-    })
+      return { ...invoice, status: "Przeterminowana" as const }
+    }
 
-    // Update invoices through the hook's function
-    updatedInvoices.forEach(invoice => {
-      if (invoice.status === "Przeterminowana") {
-        changeInvoiceStatus(invoice.id, "Przeterminowana")
-      }
-    })
-  }
+    return invoice
+  })
+
+  updatedInvoices.forEach((invoice) => {
+    if (invoice.status === "Przeterminowana") {
+      changeInvoiceStatus(invoice.id, "Przeterminowana")
+    }
+  })
+}, [addToHistory, changeInvoiceStatus, invoices, user])
+
 
   // Add useEffect to check for overdue invoices
   useEffect(() => {
@@ -477,18 +519,19 @@ export default function FinancialDashboard() {
     // Set up an interval to check daily
     const intervalId = setInterval(updateOverdueInvoices, 24 * 60 * 60 * 1000)
     return () => clearInterval(intervalId)
-  }, []) // Empty dependency array means this runs once when component mounts
+  }, [updateOverdueInvoices]) // ✅ Include dependency
 
   // Also update overdue check when invoices are modified
   useEffect(() => {
     updateOverdueInvoices()
-  }, [invoices.length]) // Run when number of invoices changes
+  }, [updateOverdueInvoices, invoices.length]) // ✅ Add updateOverdueInvoices too
 
   // Simulate loading
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1500)
     return () => clearTimeout(timer)
   }, [])
+
 
   // Check authentication
   if (!isLoaded) {
@@ -736,7 +779,7 @@ export default function FinancialDashboard() {
   const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
   const totalVat = invoices.reduce((sum, invoice) => sum + invoice.tax, 0)
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
-  
+
   console.log('=== Financial Calculations Debug ===');
   console.log('Total Revenue (Przychód):', totalRevenue);
   console.log('Total VAT:', totalVat);
@@ -797,7 +840,7 @@ export default function FinancialDashboard() {
   const currentMonthRevenue = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
   const currentMonthVat = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.tax, 0)
   const currentMonthExpensesTotal = currentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-  
+
   // Calculate current month's income
   const currentMonthIncome = currentMonthRevenue - currentMonthVat - currentMonthExpensesTotal - monthlyRecurring
 
@@ -1580,39 +1623,7 @@ export default function FinancialDashboard() {
     }
   };
 
-  // Update addToHistory function to use the new service
-  const addToHistory = async (
-    action: string,
-    type: string,
-    itemId: string,
-    description: string,
-    changes: any = null,
-    currentUser: any,
-  ) => {
-    if (!user?.id) return;
 
-    try {
-      const historyEntry = {
-        timestamp: new Date().toLocaleString("pl-PL"),
-        user: {
-          name: currentUser?.fullName || "System",
-          email: currentUser?.email || "system@app.com",
-        },
-        action,
-        type,
-        itemId,
-        description,
-        changes,
-        revertible: action !== "Wysłano przypomnienie",
-      };
-
-      const newEntry = await addHistoryEntry(user.id, historyEntry);
-      setHistoryEntries((prev: HistoryEntry[]) => [newEntry, ...prev]);
-    } catch (error) {
-      console.error('Error adding history entry:', error);
-      toast.error('Błąd podczas zapisywania historii');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -1761,7 +1772,7 @@ export default function FinancialDashboard() {
                           "text-xs",
                           expensesChange > 0 ? "text-red-600" : expensesChange < 0 ? "text-green-600" : "text-muted-foreground"
                         )}>
-                          {formatPercentageChange(expensesChange)} 
+                          {formatPercentageChange(expensesChange)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Cykliczne: {monthlyRecurring.toLocaleString()} zł
