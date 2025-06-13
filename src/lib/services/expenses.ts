@@ -8,7 +8,7 @@ import {
   doc,
   query,
   orderBy,
-  Timestamp,
+  // Timestamp,
 } from 'firebase/firestore';
 
 export interface Expense {
@@ -47,7 +47,7 @@ export async function getExpenses(userId: string): Promise<Expense[]> {
 export async function createExpense(
   userId: string,
   expenseData: Omit<Expense, 'id' | 'createdAt'>,
-  pdfFile?: File
+  // pdfFile?: File
 ): Promise<Expense> {
   try {
     if (!userId) {
@@ -84,7 +84,7 @@ export async function updateExpense(
   userId: string,
   expenseId: string,
   updates: Partial<Expense>,
-  pdfFile?: File
+  // pdfFile?: File
 ): Promise<Expense> {
   try {
     const expenseRef = doc(db, 'users', userId, 'expenses', expenseId);

@@ -23,11 +23,11 @@ export interface HistoryEntry {
   type: string;
   itemId: string;
   description: string;
-  changes: {
-    before?: any;
-    after?: any;
-    reverted?: any;
-  } | null;
+changes: {
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  reverted?: Record<string, unknown>;
+} | null;
   revertible: boolean;
   createdAt: Date;
 }
@@ -91,7 +91,7 @@ export async function addHistoryEntry(
 // Get a single history entry
 export async function getHistoryEntry(userId: string, entryId: string): Promise<HistoryEntry | null> {
   try {
-    const docRef = doc(db, 'users', userId, 'history', entryId);
+    // const docRef = doc(db, 'users', userId, 'history', entryId);
     const docSnap = await getDocs(query(collection(db, 'users', userId, 'history'), where('__name__', '==', entryId)));
     
     if (docSnap.empty) {

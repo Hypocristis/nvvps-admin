@@ -62,6 +62,7 @@ import { Switch } from "@/components/ui/switch"
 import { useRecurringPayments } from '@/hooks/useRecurringPayments';
 import { useOffers } from '@/hooks/useOffers';
 import { getHistoryEntries, addHistoryEntry, HistoryEntry } from '@/lib/services/history';
+import Image from "next/image"
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -139,92 +140,92 @@ const LoadingSkeleton = () => (
 );
 
 // Add utility function to calculate recurring payment occurrences
-function calculateRecurringPaymentAmount(payment: RecurringPayment, targetDate: Date): number {
-  console.log('=== Start payment calculation ===');
-  console.log('Payment:', payment);
-  console.log('Target date:', targetDate);
+// function calculateRecurringPaymentAmount(payment: RecurringPayment, targetDate: Date): number {
+//   console.log('=== Start payment calculation ===');
+//   console.log('Payment:', payment);
+//   console.log('Target date:', targetDate);
 
-  if (!payment.active) {
-    console.log('Payment is inactive');
-    return 0;
-  }
+//   if (!payment.active) {
+//     console.log('Payment is inactive');
+//     return 0;
+//   }
 
-  const startDate = new Date(payment.createdAt);
-  const paymentDate = new Date(payment.nextPayment);
-  const currentDate = new Date(targetDate);
+//   const startDate = new Date(payment.createdAt);
+//   const paymentDate = new Date(payment.nextPayment);
+//   const currentDate = new Date(targetDate);
 
-  console.log('Initial dates:');
-  console.log('- Start date:', startDate.toISOString());
-  console.log('- Payment date:', paymentDate.toISOString());
-  console.log('- Current date:', currentDate.toISOString());
+//   console.log('Initial dates:');
+//   console.log('- Start date:', startDate.toISOString());
+//   console.log('- Payment date:', paymentDate.toISOString());
+//   console.log('- Current date:', currentDate.toISOString());
 
-  // If the payment hasn't started yet
-  if (currentDate < startDate) {
-    console.log('Payment has not started yet');
-    return 0;
-  }
+//   // If the payment hasn't started yet
+//   if (currentDate < startDate) {
+//     console.log('Payment has not started yet');
+//     return 0;
+//   }
 
-  // For the current month check, we only care about the day of the month
-  const currentDay = currentDate.getDate();
-  const paymentDay = paymentDate.getDate();
+//   // For the current month check, we only care about the day of the month
+//   const currentDay = currentDate.getDate();
+//   const paymentDay = paymentDate.getDate();
 
-  // If we're checking the current month and the payment day hasn't passed yet
-  if (currentDate.getFullYear() === targetDate.getFullYear() && 
-      currentDate.getMonth() === targetDate.getMonth() && 
-      currentDay < paymentDay) {
-    console.log('Payment day has not passed in current month');
-    console.log(`Current day: ${currentDay}, Payment day: ${paymentDay}`);
-    return 0;
-  }
+//   // If we're checking the current month and the payment day hasn't passed yet
+//   if (currentDate.getFullYear() === targetDate.getFullYear() && 
+//       currentDate.getMonth() === targetDate.getMonth() && 
+//       currentDay < paymentDay) {
+//     console.log('Payment day has not passed in current month');
+//     console.log(`Current day: ${currentDay}, Payment day: ${paymentDay}`);
+//     return 0;
+//   }
 
-  let amount = 0;
-  console.log('Checking frequency:', payment.frequency);
+//   let amount = 0;
+//   console.log('Checking frequency:', payment.frequency);
 
-  switch (payment.frequency) {
-    case 'Miesięcznie':
-      // For monthly payments, always include if the payment day has passed
-      amount = payment.amount;
-      console.log('Monthly payment amount:', amount);
-      break;
+//   switch (payment.frequency) {
+//     case 'Miesięcznie':
+//       // For monthly payments, always include if the payment day has passed
+//       amount = payment.amount;
+//       console.log('Monthly payment amount:', amount);
+//       break;
 
-    case 'Kwartalnie':
-      // For quarterly payments, check if this is a payment month
-      const monthsSinceStart = (currentDate.getFullYear() - startDate.getFullYear()) * 12 
-                              + (currentDate.getMonth() - startDate.getMonth());
-      const isQuarterlyPaymentMonth = monthsSinceStart % 3 === 0;
-      amount = isQuarterlyPaymentMonth ? payment.amount : 0;
-      console.log('Quarterly payment check:');
-      console.log('- Months since start:', monthsSinceStart);
-      console.log('- Is payment month:', isQuarterlyPaymentMonth);
-      console.log('- Amount:', amount);
-      break;
+//     case 'Kwartalnie':
+//       // For quarterly payments, check if this is a payment month
+//       const monthsSinceStart = (currentDate.getFullYear() - startDate.getFullYear()) * 12 
+//                               + (currentDate.getMonth() - startDate.getMonth());
+//       const isQuarterlyPaymentMonth = monthsSinceStart % 3 === 0;
+//       amount = isQuarterlyPaymentMonth ? payment.amount : 0;
+//       console.log('Quarterly payment check:');
+//       console.log('- Months since start:', monthsSinceStart);
+//       console.log('- Is payment month:', isQuarterlyPaymentMonth);
+//       console.log('- Amount:', amount);
+//       break;
 
-    case 'Rocznie':
-      // For yearly payments, check if this is the same month as the start date
-      const isYearlyPaymentMonth = currentDate.getMonth() === startDate.getMonth();
-      amount = isYearlyPaymentMonth ? payment.amount : 0;
-      console.log('Yearly payment check:');
-      console.log('- Current month:', currentDate.getMonth());
-      console.log('- Start month:', startDate.getMonth());
-      console.log('- Is payment month:', isYearlyPaymentMonth);
-      console.log('- Amount:', amount);
-      break;
+//     case 'Rocznie':
+//       // For yearly payments, check if this is the same month as the start date
+//       const isYearlyPaymentMonth = currentDate.getMonth() === startDate.getMonth();
+//       amount = isYearlyPaymentMonth ? payment.amount : 0;
+//       console.log('Yearly payment check:');
+//       console.log('- Current month:', currentDate.getMonth());
+//       console.log('- Start month:', startDate.getMonth());
+//       console.log('- Is payment month:', isYearlyPaymentMonth);
+//       console.log('- Amount:', amount);
+//       break;
 
-    default:
-      console.log('Unknown frequency:', payment.frequency);
-      amount = 0;
-  }
+//     default:
+//       console.log('Unknown frequency:', payment.frequency);
+//       amount = 0;
+//   }
 
-  console.log('Final amount:', amount);
-  console.log('=== End payment calculation ===');
-  return amount;
-}
+//   console.log('Final amount:', amount);
+//   console.log('=== End payment calculation ===');
+//   return amount;
+// }
 
-function calculateTotalRecurringForMonth(payments: RecurringPayment[], targetDate: Date): number {
-  return payments
-    .filter(p => p.active)
-    .reduce((sum, payment) => sum + calculateRecurringPaymentAmount(payment, targetDate), 0);
-}
+// function calculateTotalRecurringForMonth(payments: RecurringPayment[], targetDate: Date): number {
+//   return payments
+//     .filter(p => p.active)
+//     .reduce((sum, payment) => sum + calculateRecurringPaymentAmount(payment, targetDate), 0);
+// }
 
 // Add function to calculate accumulated recurring payments
 function calculateAccumulatedRecurringPayments(payments: RecurringPayment[], endDate: Date): number {
@@ -288,8 +289,8 @@ export default function FinancialDashboard() {
   const { user, isLoaded, isSignedIn } = useUser()
   const {
     invoices,
-    isLoading: isLoadingInvoices,
-    error: invoicesError,
+    // isLoading: isLoadingInvoices,
+    // error: invoicesError,
     addInvoice,
     editInvoice,
     removeInvoice,
@@ -301,7 +302,7 @@ export default function FinancialDashboard() {
   const {
     expenses,
     isLoading: isLoadingExpenses,
-    error: expensesError,
+    // error: expensesError,
     addExpense,
     editExpense,
     removeExpense,
@@ -311,7 +312,7 @@ export default function FinancialDashboard() {
   const {
     payments: recurringPayments,
     isLoading: isLoadingRecurringPayments,
-    error: recurringPaymentsError,
+    // error: recurringPaymentsError,
     addPayment,
     editPayment,
     removePayment,
@@ -322,7 +323,7 @@ export default function FinancialDashboard() {
   const {
     offers,
     isLoading: isLoadingOffers,
-    error: offersError,
+    // error: offersError,
     addOffer,
     editOffer,
     removeOffer,
@@ -374,7 +375,7 @@ export default function FinancialDashboard() {
   const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false)
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
   const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false)
-  const [isEditRecurringOpen, setIsEditRecurringOpen] = useState(false)
+  // const [isEditRecurringOpen, setIsEditRecurringOpen] = useState(false)
   const [isAddOfferOpen, setIsAddOfferOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<any>(null)
 
@@ -423,7 +424,7 @@ export default function FinancialDashboard() {
   // Add these new state variables
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
   const [currentPdfUrl, setCurrentPdfUrl] = useState("")
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState<string | null>(null)
+  // const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState<string | null>(null)
 
   // Add this state for the confirmation dialog
   const [reminderConfirmation, setReminderConfirmation] = useState<{ isOpen: boolean; invoice: Invoice | null }>({
@@ -503,26 +504,26 @@ export default function FinancialDashboard() {
   }
 
   // Google Drive API integration
-  const uploadToGoogleDrive = async (file: File, fileName: string) => {
-    try {
-      // Mock Google Drive API call
-      console.log(`Uploading ${fileName} to Google Drive...`)
+  // const uploadToGoogleDrive = async (file: File, fileName: string) => {
+  //   try {
+  //     // Mock Google Drive API call
+  //     console.log(`Uploading ${fileName} to Google Drive...`)
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+  //     // Simulate API call
+  //     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      const mockDriveUrl = `https://drive.google.com/file/${Math.random().toString(36).substr(2, 9)}`
-      console.log(`File uploaded successfully: ${mockDriveUrl}`)
+  //     const mockDriveUrl = `https://drive.google.com/file/${Math.random().toString(36).substr(2, 9)}`
+  //     console.log(`File uploaded successfully: ${mockDriveUrl}`)
 
-      return mockDriveUrl
-    } catch (error) {
-      console.error("Error uploading to Google Drive:", error)
-      throw error
-    }
-  }
+  //     return mockDriveUrl
+  //   } catch (error) {
+  //     console.error("Error uploading to Google Drive:", error)
+  //     throw error
+  //   }
+  // }
 
   // Email API integration
-  const sendReminderEmail = async (invoice: Invoice, userInfo: any) => {
+  const sendReminderEmail = async (invoice: Invoice) => {
     try {
       const emailData = {
         sendTo: invoice.representativeEmail,
@@ -877,7 +878,7 @@ export default function FinancialDashboard() {
         user,
       );
       toast.success("Status updated successfully");
-      setIsStatusDropdownOpen(null);
+      // setIsStatusDropdownOpen(null);
     } catch (error) {
       console.error("Error updating status:", error);
       toast.error("Failed to update status");
@@ -1195,7 +1196,7 @@ export default function FinancialDashboard() {
       }
 
       setIsAddRecurringOpen(false);
-      setIsEditRecurringOpen(false);
+      // setIsEditRecurringOpen(false);
       setNewRecurring({ name: "", amount: "", frequency: "", category: "", nextPayment: "" });
       setSelectedRecurringFile(null);
       setEditingItem(null);
@@ -1340,7 +1341,7 @@ export default function FinancialDashboard() {
     if (!reminderConfirmation.invoice) return;
 
     try {
-      await sendReminderEmail(reminderConfirmation.invoice, user);
+      await sendReminderEmail(reminderConfirmation.invoice);
       addToHistory(
         "Wysłano przypomnienie",
         "Faktura",
@@ -1350,7 +1351,7 @@ export default function FinancialDashboard() {
         user,
       );
       toast.success(`Przypomnienie zostało wysłane do ${reminderConfirmation.invoice.representativeEmail}`);
-    } catch (error) {
+    } catch {
       toast.error("Błąd podczas wysyłania przypomnienia");
     } finally {
       setReminderConfirmation({ isOpen: false, invoice: null });
@@ -1629,7 +1630,7 @@ export default function FinancialDashboard() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-                      <img
+                      <Image
                         className="h-10 w-10 rounded-full object-cover border-2 border-border"
                         src={user?.imageUrl || "/placeholder.svg?height=40&width=40"}
                         alt={user?.fullName || "User"}
@@ -3007,7 +3008,7 @@ export default function FinancialDashboard() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex items-center gap-4">
-              <img
+              <Image
                 className="h-16 w-16 rounded-full object-cover border-2 border-border"
                 src={user?.imageUrl || "/placeholder.svg?height=64&width=64"}
                 alt={user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}

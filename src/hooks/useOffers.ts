@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db, storage } from '@/lib/firebase/config';
+import { db } from '@/lib/firebase/config';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+// import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useUser } from '@clerk/nextjs';
 
 export interface Offer {

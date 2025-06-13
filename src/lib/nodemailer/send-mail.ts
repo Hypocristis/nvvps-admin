@@ -29,7 +29,7 @@ export async function sendMail(emailData: EmailData) {
   }
 
   try {
-    const isVerified = await transporter.verify();
+    // const isVerified = await transporter.verify();
   } catch (error) {
     console.error('SMTP Configuration Error:', error);
     throw error;

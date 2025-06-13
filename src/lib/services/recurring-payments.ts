@@ -48,7 +48,7 @@ export async function getRecurringPayments(userId: string): Promise<RecurringPay
 export async function createRecurringPayment(
   userId: string,
   paymentData: Omit<RecurringPayment, 'id' | 'createdAt'>,
-  pdfFile?: File
+  // pdfFile?: File
 ): Promise<RecurringPayment> {
   try {
     const paymentWithMetadata = {
@@ -75,7 +75,7 @@ export async function updateRecurringPayment(
   userId: string,
   paymentId: string,
   updates: Partial<RecurringPayment>,
-  pdfFile?: File
+  // pdfFile?: File
 ): Promise<RecurringPayment> {
   try {
     const paymentRef = doc(db, 'users', userId, 'recurring-payments', paymentId);
