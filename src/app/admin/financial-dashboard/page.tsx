@@ -64,6 +64,16 @@ import { useOffers } from '@/hooks/useOffers';
 import { getHistoryEntries, addHistoryEntry, HistoryEntry } from '@/lib/services/history';
 import Image from "next/image"
 
+import { Expense } from "@/lib/services/expenses"
+import { Offer } from "@/hooks/useOffers"
+
+type EditableItem =
+  | (RecurringPayment & { type: "recurring" })
+  | (Invoice & { type: "invoice" })
+  | (Expense & { type: "expense" })
+  | (Offer & { type: "offer" })
+
+
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
   id: string;
@@ -80,6 +90,7 @@ interface Invoice {
   representativeEmail: string;
   representativeGender: string;
   invoiceNumber: string;
+  description?: string;
 }
 
 // Add this type after the Invoice interface
@@ -377,7 +388,7 @@ export default function FinancialDashboard() {
   const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false)
   // const [isEditRecurringOpen, setIsEditRecurringOpen] = useState(false)
   const [isAddOfferOpen, setIsAddOfferOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<any>(null)
+  const [editingItem, setEditingItem] = useState<EditableItem | null>(null)
 
   // File upload states
   const [selectedInvoiceFile, setSelectedInvoiceFile] = useState<File | null>(null)
@@ -1035,20 +1046,23 @@ const addToHistory = useCallback(
       }
 
       const invoiceData = {
-        invoiceNumber,
-        date: editingItem ? editingItem.date : new Date().toISOString().split("T")[0],
-        sentDate: editingItem ? editingItem.sentDate : null,
-        client: newInvoice.client,
-        amount: Number.parseFloat(newInvoice.amount),
-        tax: Number.parseFloat(newInvoice.amount) * (Number.parseFloat(newInvoice.vatRate) / 100),
-        vatRate: Number.parseFloat(newInvoice.vatRate),
-        status: editingItem ? editingItem.status : "Stworzona",
-        dueDate: newInvoice.dueDate,
-        representativeName: newInvoice.representativeName,
-        representativeEmail: newInvoice.representativeEmail,
-        representativeGender: newInvoice.representativeGender,
-        pdfUrl: null,
-      };
+  invoiceNumber,
+  date:
+    editingItem?.type === "invoice"
+      ? editingItem.date
+      : new Date().toISOString().split("T")[0],
+  sentDate: editingItem?.type === "invoice" ? editingItem.sentDate : null,
+  client: newInvoice.client,
+  amount: Number.parseFloat(newInvoice.amount),
+  tax: Number.parseFloat(newInvoice.amount) * (Number.parseFloat(newInvoice.vatRate) / 100),
+  vatRate: Number.parseFloat(newInvoice.vatRate),
+  status: editingItem?.type === "invoice" ? editingItem.status : "Stworzona",
+  dueDate: newInvoice.dueDate,
+  representativeName: newInvoice.representativeName,
+  representativeEmail: newInvoice.representativeEmail,
+  representativeGender: newInvoice.representativeGender,
+  pdfUrl: null,
+};
 
       if (editingItem) {
         await editInvoice(editingItem.id, invoiceData, selectedInvoiceFile || undefined);
@@ -1270,16 +1284,22 @@ const addToHistory = useCallback(
       }
 
       const offerData = {
-        title: newOffer.title,
-        client: newOffer.client,
-        amount: Number.parseFloat(newOffer.amount),
-        expirationDate: newOffer.expirationDate,
-        googleDocsUrl: newOffer.googleDocsUrl,
-        description: newOffer.description || '',
-        status: (editingItem ? editingItem.status : 'Szkic') as 'Szkic' | 'Wysłana' | 'Zaakceptowana' | 'Odrzucona',
-        createdDate: editingItem?.createdDate || new Date().toISOString().split('T')[0],
-        sentDate: editingItem?.sentDate || null
-      };
+  title: newOffer.title,
+  client: newOffer.client,
+  amount: Number.parseFloat(newOffer.amount),
+  expirationDate: newOffer.expirationDate,
+  googleDocsUrl: newOffer.googleDocsUrl,
+  description: newOffer.description || '',
+  status:
+    editingItem?.type === "offer"
+      ? editingItem.status
+      : "Szkic",
+  createdDate:
+    editingItem?.type === "offer"
+      ? editingItem.createdDate
+      : new Date().toISOString().split("T")[0],
+  sentDate: editingItem?.type === "offer" ? editingItem.sentDate : null,
+};
 
       if (editingItem) {
         await editOffer(editingItem.id, offerData);
@@ -1322,58 +1342,64 @@ const addToHistory = useCallback(
     }
   };
 
-  const handleEdit = (item: any, type: string) => {
-    setEditingItem({ ...item, type });
+  const handleEdit = (item: Omit<EditableItem, "type">, type: EditableItem["type"]) => {
+  const fullItem = { ...item, type } as EditableItem
+  setEditingItem(fullItem)
 
-    if (type === "recurring") {
-      setNewRecurring({
-        name: item.name,
-        amount: item.amount.toString(),
-        frequency: item.frequency,
-        category: item.category,
-        nextPayment: item.nextPayment,
-      });
-      setIsPaymentDisplayOpen(false); // Close the display modal if it's open
-      setIsAddRecurringOpen(true);
-    }
-
-    if (type === "invoice") {
-      setNewInvoice({
-        invoiceNumber: item.invoiceNumber,
-        client: item.client,
-        amount: item.amount.toString(),
-        dueDate: item.dueDate,
-        description: item.description || "",
-        representativeName: item.representativeName,
-        representativeEmail: item.representativeEmail,
-        representativeGender: item.representativeGender || "male",
-        vatRate: item.vatRate.toString(),
-      })
-      setIsAddInvoiceOpen(true)
-    }
-
-    if (type === "expense") {
-      setNewExpense({
-        description: item.description,
-        amount: item.amount.toString(),
-        category: item.category,
-        date: item.date,
-      })
-      setIsAddExpenseOpen(true)
-    }
-
-    if (type === "offer") {
-      setNewOffer({
-        title: item.title,
-        client: item.client,
-        amount: item.amount.toString(),
-        expirationDate: item.expirationDate,
-        googleDocsUrl: item.googleDocsUrl,
-        description: item.description || "",
-      })
-      setIsAddOfferOpen(true)
-    }
+  if (type === "recurring") {
+    const recurring = fullItem as Extract<EditableItem, { type: "recurring" }>
+    setNewRecurring({
+      name: recurring.name,
+      amount: recurring.amount.toString(),
+      frequency: recurring.frequency,
+      category: recurring.category,
+      nextPayment: recurring.nextPayment,
+    })
+    setIsPaymentDisplayOpen(false)
+    setIsAddRecurringOpen(true)
   }
+
+  if (type === "invoice") {
+  const invoice = item as Extract<EditableItem, { type: "invoice" }>;
+  setNewInvoice({
+    invoiceNumber: invoice.invoiceNumber,
+    client: invoice.client,
+    amount: invoice.amount.toString(),
+    dueDate: invoice.dueDate,
+    description: invoice.description || "",
+    representativeName: invoice.representativeName,
+    representativeEmail: invoice.representativeEmail,
+    representativeGender: invoice.representativeGender || "male",
+    vatRate: invoice.vatRate.toString(),
+  });
+  setIsAddInvoiceOpen(true);
+}
+
+
+  if (type === "expense") {
+    const expense = fullItem as Extract<EditableItem, { type: "expense" }>
+    setNewExpense({
+      description: expense.description,
+      amount: expense.amount.toString(),
+      category: expense.category,
+      date: expense.date,
+    })
+    setIsAddExpenseOpen(true)
+  }
+
+  if (type === "offer") {
+    const offer = fullItem as Extract<EditableItem, { type: "offer" }>
+    setNewOffer({
+      title: offer.title,
+      client: offer.client,
+      amount: offer.amount.toString(),
+      expirationDate: offer.expirationDate,
+      googleDocsUrl: offer.googleDocsUrl,
+      description: offer.description || "",
+    })
+    setIsAddOfferOpen(true)
+  }
+}
 
   // Update the remindClient function
   const remindClient = async (invoice: Invoice) => {
@@ -2903,7 +2929,7 @@ const addToHistory = useCallback(
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => handleEdit(selectedPayment, "recurring")}
+                    onClick={() => handleEdit(selectedPayment as RecurringPayment, "recurring")}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edytuj
