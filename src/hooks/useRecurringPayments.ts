@@ -37,12 +37,12 @@ export function useRecurringPayments() {
   }, [user?.id]);
 
   // Add new recurring payment
-  const addPayment = async (paymentData: Omit<RecurringPayment, 'id' | 'createdAt'>, pdfFile?: File) => {
+  const addPayment = async (paymentData: Omit<RecurringPayment, 'id' | 'createdAt'>) => {
     if (!user?.id) return null;
     
     try {
       setIsLoading(true);
-      const newPayment = await createRecurringPayment(user.id, paymentData, pdfFile);
+      const newPayment = await createRecurringPayment(user.id, paymentData);
       setPayments(prev => [newPayment, ...prev]);
       setError(null);
       return newPayment;
@@ -56,12 +56,12 @@ export function useRecurringPayments() {
   };
 
   // Update existing recurring payment
-  const editPayment = async (paymentId: string, updates: Partial<RecurringPayment>, pdfFile?: File) => {
+  const editPayment = async (paymentId: string, updates: Partial<RecurringPayment>) => {
     if (!user?.id) return null;
     
     try {
       setIsLoading(true);
-      const updatedPayment = await updateRecurringPayment(user.id, paymentId, updates, pdfFile);
+      const updatedPayment = await updateRecurringPayment(user.id, paymentId, updates);
       setPayments(prev => prev.map(payment => payment.id === paymentId ? updatedPayment : payment));
       setError(null);
       return updatedPayment;

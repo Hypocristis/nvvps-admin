@@ -1038,7 +1038,7 @@ const addToHistory = useCallback(
       };
 
       if (editingItem) {
-        await editExpense(editingItem.id, expenseData, selectedExpenseFile || undefined);
+        await editExpense(editingItem.id, expenseData);
         await addToHistory(
           "Edytowano",
           "Wydatek",
@@ -1052,7 +1052,7 @@ const addToHistory = useCallback(
         );
         toast.success("Expense updated successfully");
       } else {
-        const newExpenseRef = await addExpense(expenseData, selectedExpenseFile || undefined);
+        const newExpenseRef = await addExpense(expenseData);
         if (!newExpenseRef?.id) {
           throw new Error('Failed to create expense: No ID returned');
         }
@@ -1114,7 +1114,7 @@ const addToHistory = useCallback(
       };
 
       if (editingItem) {
-        await editPayment(editingItem.id, recurringData, selectedRecurringFile || undefined);
+        await editPayment(editingItem.id, recurringData);
         await addToHistory(
           "Edytowano",
           "Płatność cykliczna",
@@ -1128,7 +1128,7 @@ const addToHistory = useCallback(
         );
         toast.success("Recurring payment updated successfully");
       } else {
-        const newPaymentRef = await addPayment(recurringData, selectedRecurringFile || undefined);
+        const newPaymentRef = await addPayment(recurringData);
         if (!newPaymentRef?.id) {
           throw new Error('Failed to create recurring payment: No ID returned');
         }

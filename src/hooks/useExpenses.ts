@@ -36,12 +36,12 @@ export function useExpenses() {
   }, [user?.id]);
 
   // Add new expense
-  const addExpense = async (expenseData: Omit<Expense, 'id' | 'userId' | 'createdAt'>, pdfFile?: File) => {
+  const addExpense = async (expenseData: Omit<Expense, 'id' | 'userId' | 'createdAt'>) => {
     if (!user?.id) return null;
     
     try {
       setIsLoading(true);
-      const newExpense = await createExpense(user.id, expenseData, pdfFile);
+      const newExpense = await createExpense(user.id, expenseData);
       setExpenses(prev => [newExpense, ...prev]);
       setError(null);
       return newExpense;
@@ -55,12 +55,12 @@ export function useExpenses() {
   };
 
   // Update existing expense
-  const editExpense = async (expenseId: string, updates: Partial<Expense>, pdfFile?: File) => {
+  const editExpense = async (expenseId: string, updates: Partial<Expense>) => {
     if (!user?.id) return null;
     
     try {
       setIsLoading(true);
-      const updatedExpense = await updateExpense(user.id, expenseId, updates, pdfFile);
+      const updatedExpense = await updateExpense(user.id, expenseId, updates);
       setExpenses(prev => prev.map(exp => exp.id === expenseId ? updatedExpense : exp));
       setError(null);
       return updatedExpense;
