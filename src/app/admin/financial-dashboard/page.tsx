@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react";
 import {
   CalendarDays,
   DollarSign,
@@ -14,13 +14,25 @@ import {
   Trash2,
   Download,
   X,
-} from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -29,12 +41,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { RevenueChart } from "@/components/revenue-chart"
-import { ExpenseChart } from "@/components/expense-chart"
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { RevenueChart } from "@/components/revenue-chart";
+import { ExpenseChart } from "@/components/expense-chart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,37 +54,55 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { User, Settings, LogOut, Undo2, Shield, CreditCard, Key } from "lucide-react"
-import { useUser, SignOutButton, RedirectToSignIn } from "@clerk/nextjs"
-import { Textarea } from "@/components/ui/textarea"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+} from "@/components/ui/dropdown-menu";
+import {
+  User,
+  Settings,
+  LogOut,
+  Undo2,
+  Shield,
+  CreditCard,
+  Key,
+} from "lucide-react";
+import { useUser, SignOutButton, RedirectToSignIn } from "@clerk/nextjs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { useInvoices } from '@/hooks/useInvoices';
-import { Toaster } from "@/components/ui/sonner"
-import { toast } from "sonner"
-import { sendMail } from '@/lib/nodemailer/send-mail';
-import { useExpenses } from '@/hooks/useExpenses';
-import { Switch } from "@/components/ui/switch"
-import { useRecurringPayments } from '@/hooks/useRecurringPayments';
-import { useOffers } from '@/hooks/useOffers';
-import { getHistoryEntries, addHistoryEntry, HistoryEntry } from '@/lib/services/history';
-import Image from "next/image"
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useInvoices } from "@/hooks/useInvoices";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { sendMail } from "@/lib/nodemailer/send-mail";
+import { useExpenses } from "@/hooks/useExpenses";
+import { Switch } from "@/components/ui/switch";
+import { useRecurringPayments } from "@/hooks/useRecurringPayments";
+import { useOffers } from "@/hooks/useOffers";
+import {
+  getHistoryEntries,
+  addHistoryEntry,
+  HistoryEntry,
+} from "@/lib/services/history";
+import Image from "next/image";
 
-import { Expense } from "@/lib/services/expenses"
-import { Offer } from "@/hooks/useOffers"
+import { Expense } from "@/lib/services/expenses";
+import { Offer } from "@/hooks/useOffers";
 
 type EditableItem =
   | (RecurringPayment & { type: "recurring" })
   | (Invoice & { type: "invoice" })
   | (Expense & { type: "expense" })
-  | (Offer & { type: "offer" })
-
+  | (Offer & { type: "offer" });
 
 // Add this interface after the imports and before the historyLog declaration
 interface Invoice {
@@ -110,7 +140,10 @@ interface RecurringPayment {
 }
 
 // Add back the calculateNextPaymentDate function
-const calculateNextPaymentDate = (paymentDate: string, frequency: string): string => {
+const calculateNextPaymentDate = (
+  paymentDate: string,
+  frequency: string,
+): string => {
   const currentDate = new Date();
   const baseDate = new Date(paymentDate);
   const paymentDay = baseDate.getDate();
@@ -138,7 +171,7 @@ const calculateNextPaymentDate = (paymentDate: string, frequency: string): strin
     }
   }
 
-  return nextDate.toISOString().split('T')[0];
+  return nextDate.toISOString().split("T")[0];
 };
 
 // Add LoadingSkeleton component at the top of the file
@@ -151,65 +184,71 @@ const LoadingSkeleton = () => (
 );
 
 // Add function to calculate accumulated recurring payments
-function calculateAccumulatedRecurringPayments(payments: RecurringPayment[], endDate: Date): number {
+function calculateAccumulatedRecurringPayments(
+  payments: RecurringPayment[],
+  endDate: Date,
+): number {
   let total = 0;
   const currentDate = new Date(endDate);
 
-  payments.filter(p => p.active).forEach(payment => {
-    const startDate = new Date(payment.nextPayment); // Changed from createdAt to nextPayment
+  payments
+    .filter((p) => p.active)
+    .forEach((payment) => {
+      const startDate = new Date(payment.nextPayment); // Changed from createdAt to nextPayment
 
-    console.log(`\nCalculating accumulated payments for: ${payment.name}`);
-    console.log(`Payment date: ${startDate.toISOString().split('T')[0]}`);
-    console.log(`Current date: ${currentDate.toISOString().split('T')[0]}`);
-    console.log(`Amount: ${payment.amount}`);
-    console.log(`Frequency: ${payment.frequency}`);
+      console.log(`\nCalculating accumulated payments for: ${payment.name}`);
+      console.log(`Payment date: ${startDate.toISOString().split("T")[0]}`);
+      console.log(`Current date: ${currentDate.toISOString().split("T")[0]}`);
+      console.log(`Amount: ${payment.amount}`);
+      console.log(`Frequency: ${payment.frequency}`);
 
-    // Calculate full months between start date and current date
-    const startYear = startDate.getFullYear();
-    const startMonth = startDate.getMonth();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
+      // Calculate full months between start date and current date
+      const startYear = startDate.getFullYear();
+      const startMonth = startDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
 
-    // Calculate months difference (0-based)
-    let monthsDiff = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+      // Calculate months difference (0-based)
+      let monthsDiff =
+        (currentYear - startYear) * 12 + (currentMonth - startMonth);
 
-    // If we're past the payment day in the current month, include this month
-    if (currentDate.getDate() >= startDate.getDate()) {
-      monthsDiff += 1;
-    }
+      // If we're past the payment day in the current month, include this month
+      if (currentDate.getDate() >= startDate.getDate()) {
+        monthsDiff += 1;
+      }
 
-    console.log(`Months difference: ${monthsDiff}`);
+      console.log(`Months difference: ${monthsDiff}`);
 
-    let paymentTotal = 0;
-    switch (payment.frequency) {
-      case 'Miesięcznie':
-        paymentTotal = payment.amount * monthsDiff;
-        break;
+      let paymentTotal = 0;
+      switch (payment.frequency) {
+        case "Miesięcznie":
+          paymentTotal = payment.amount * monthsDiff;
+          break;
 
-      case 'Kwartalnie':
-        // Calculate complete quarters
-        const quarters = Math.floor(monthsDiff / 3);
-        paymentTotal = payment.amount * quarters;
-        break;
+        case "Kwartalnie":
+          // Calculate complete quarters
+          const quarters = Math.floor(monthsDiff / 3);
+          paymentTotal = payment.amount * quarters;
+          break;
 
-      case 'Rocznie':
-        // Calculate complete years
-        const years = Math.floor(monthsDiff / 12);
-        paymentTotal = payment.amount * years;
-        break;
-    }
+        case "Rocznie":
+          // Calculate complete years
+          const years = Math.floor(monthsDiff / 12);
+          paymentTotal = payment.amount * years;
+          break;
+      }
 
-    console.log(`Number of payments: ${monthsDiff}`);
-    console.log(`Total for this payment: ${paymentTotal}`);
-    total += paymentTotal;
-  });
+      console.log(`Number of payments: ${monthsDiff}`);
+      console.log(`Total for this payment: ${paymentTotal}`);
+      total += paymentTotal;
+    });
 
   console.log(`\nTotal accumulated recurring payments: ${total}`);
   return total;
 }
 
 export default function FinancialDashboard() {
-  const { user, isLoaded, isSignedIn } = useUser()
+  const { user, isLoaded, isSignedIn } = useUser();
   const {
     invoices,
     // isLoading: isLoadingInvoices,
@@ -254,14 +293,14 @@ export default function FinancialDashboard() {
   } = useOffers();
 
   // UI states
-  const [activeTab, setActiveTab] = useState("dashboard")
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [historyFilter, setHistoryFilter] = useState("all")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [isLoading, setIsLoading] = useState(true)
-  const [nextInvoiceNumber, setNextInvoiceNumber] = useState("")
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState("");
 
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -284,8 +323,8 @@ export default function FinancialDashboard() {
         const entries = await getHistoryEntries(user.id);
         setHistoryEntries(entries);
       } catch (error) {
-        console.error('Error loading history entries:', error);
-        toast.error('Błąd podczas ładowania historii');
+        console.error("Error loading history entries:", error);
+        toast.error("Błąd podczas ładowania historii");
       } finally {
         setIsHistoryLoading(false);
       }
@@ -295,17 +334,22 @@ export default function FinancialDashboard() {
   }, [user?.id]);
 
   // Modal states
-  const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false)
-  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
-  const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false)
+  const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false);
   // const [isEditRecurringOpen, setIsEditRecurringOpen] = useState(false)
-  const [isAddOfferOpen, setIsAddOfferOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<EditableItem | null>(null)
+  const [isAddOfferOpen, setIsAddOfferOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<EditableItem | null>(null);
 
   // File upload states
-  const [selectedInvoiceFile, setSelectedInvoiceFile] = useState<File | null>(null)
-  const [selectedExpenseFile, setSelectedExpenseFile] = useState<File | null>(null)
-  const [selectedRecurringFile, setSelectedRecurringFile] = useState<File | null>(null)
+  const [selectedInvoiceFile, setSelectedInvoiceFile] = useState<File | null>(
+    null,
+  );
+  const [selectedExpenseFile, setSelectedExpenseFile] = useState<File | null>(
+    null,
+  );
+  const [selectedRecurringFile, setSelectedRecurringFile] =
+    useState<File | null>(null);
 
   // Form states
   const [newInvoice, setNewInvoice] = useState({
@@ -325,7 +369,7 @@ export default function FinancialDashboard() {
     amount: "",
     category: "",
     date: "",
-  })
+  });
 
   const [newRecurring, setNewRecurring] = useState({
     name: "",
@@ -333,7 +377,7 @@ export default function FinancialDashboard() {
     frequency: "",
     category: "",
     nextPayment: "",
-  })
+  });
 
   const [newOffer, setNewOffer] = useState({
     title: "",
@@ -342,119 +386,124 @@ export default function FinancialDashboard() {
     expirationDate: "",
     googleDocsUrl: "",
     description: "",
-  })
+  });
 
   // Add these new state variables
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
-  const [currentPdfUrl, setCurrentPdfUrl] = useState("")
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState("");
   // const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState<string | null>(null)
 
   // Add this state for the confirmation dialog
-  const [reminderConfirmation, setReminderConfirmation] = useState<{ isOpen: boolean; invoice: Invoice | null }>({
+  const [reminderConfirmation, setReminderConfirmation] = useState<{
+    isOpen: boolean;
+    invoice: Invoice | null;
+  }>({
     isOpen: false,
-    invoice: null
+    invoice: null,
   });
 
   // Add new state for payment display modal
   const [isPaymentDisplayOpen, setIsPaymentDisplayOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | null>(null);
+  const [selectedPayment, setSelectedPayment] =
+    useState<RecurringPayment | null>(null);
 
-type MinimalUser = {
-  fullName?: string | null
-  email?: string | null
-}
+  type MinimalUser = {
+    fullName?: string | null;
+    email?: string | null;
+  };
 
-const addToHistory = useCallback(
-  async (
-    action: string,
-    type: string,
-    itemId: string,
-    description: string,
-    changes: Record<string, unknown> | null = null,
-    currentUser: MinimalUser
-  ) => {
-    if (!user?.id) return
+  const addToHistory = useCallback(
+    async (
+      action: string,
+      type: string,
+      itemId: string,
+      description: string,
+      changes: Record<string, unknown> | null = null,
+      currentUser: MinimalUser,
+    ) => {
+      if (!user?.id) return;
 
-    try {
-      const historyEntry = {
-        timestamp: new Date().toLocaleString("pl-PL"),
-        user: {
-          name: currentUser?.fullName || "System",
-          email: currentUser?.email || "system@app.com",
-        },
-        action,
-        type,
-        itemId,
-        description,
-        changes,
-        revertible: action !== "Wysłano przypomnienie",
+      try {
+        const historyEntry = {
+          timestamp: new Date().toLocaleString("pl-PL"),
+          user: {
+            name: currentUser?.fullName || "System",
+            email: currentUser?.email || "system@app.com",
+          },
+          action,
+          type,
+          itemId,
+          description,
+          changes,
+          revertible: action !== "Wysłano przypomnienie",
+        };
+
+        const newEntry = await addHistoryEntry(user.id, historyEntry);
+        setHistoryEntries((prev: HistoryEntry[]) => [newEntry, ...prev]);
+      } catch (error) {
+        console.error("Error adding history entry:", error);
+        toast.error("Błąd podczas zapisywania historii");
       }
-
-      const newEntry = await addHistoryEntry(user.id, historyEntry)
-      setHistoryEntries((prev: HistoryEntry[]) => [newEntry, ...prev])
-    } catch (error) {
-      console.error("Error adding history entry:", error)
-      toast.error("Błąd podczas zapisywania historii")
-    }
-  },
-  [user, setHistoryEntries]
-)
+    },
+    [user, setHistoryEntries],
+  );
 
   // Add function to check and update overdue invoices
   const updateOverdueInvoices = useCallback(() => {
-  if (!user) return; // ✅ Prevent undefined/null from being passed
+    if (!user) return; // ✅ Prevent undefined/null from being passed
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const updatedInvoices = invoices.map((invoice) => {
-    const dueDate = new Date(invoice.dueDate)
-    dueDate.setHours(0, 0, 0, 0)
+    const updatedInvoices = invoices.map((invoice) => {
+      const dueDate = new Date(invoice.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
 
-    if (dueDate < today && invoice.status !== "Zapłacona") {
-      if (invoice.status !== "Przeterminowana") {
-        addToHistory(
-          "Edytowano",
-          "Faktura",
-          invoice.id,
-          `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
-          { before: { status: invoice.status }, after: { status: "Przeterminowana" } },
-          user
-        )
+      if (dueDate < today && invoice.status !== "Zapłacona") {
+        if (invoice.status !== "Przeterminowana") {
+          addToHistory(
+            "Edytowano",
+            "Faktura",
+            invoice.id,
+            `Automatycznie zmieniono status faktury ${invoice.id} na Przeterminowana`,
+            {
+              before: { status: invoice.status },
+              after: { status: "Przeterminowana" },
+            },
+            user,
+          );
+        }
+        return { ...invoice, status: "Przeterminowana" as const };
       }
-      return { ...invoice, status: "Przeterminowana" as const }
-    }
 
-    return invoice
-  })
+      return invoice;
+    });
 
-  updatedInvoices.forEach((invoice) => {
-    if (invoice.status === "Przeterminowana") {
-      changeInvoiceStatus(invoice.id, "Przeterminowana")
-    }
-  })
-}, [addToHistory, changeInvoiceStatus, invoices, user])
-
+    updatedInvoices.forEach((invoice) => {
+      if (invoice.status === "Przeterminowana") {
+        changeInvoiceStatus(invoice.id, "Przeterminowana");
+      }
+    });
+  }, [addToHistory, changeInvoiceStatus, invoices, user]);
 
   // Add useEffect to check for overdue invoices
   useEffect(() => {
-    updateOverdueInvoices()
+    updateOverdueInvoices();
     // Set up an interval to check daily
-    const intervalId = setInterval(updateOverdueInvoices, 24 * 60 * 60 * 1000)
-    return () => clearInterval(intervalId)
-  }, [updateOverdueInvoices]) // ✅ Include dependency
+    const intervalId = setInterval(updateOverdueInvoices, 24 * 60 * 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [updateOverdueInvoices]); // ✅ Include dependency
 
   // Also update overdue check when invoices are modified
   useEffect(() => {
-    updateOverdueInvoices()
-  }, [updateOverdueInvoices, invoices.length]) // ✅ Add updateOverdueInvoices too
+    updateOverdueInvoices();
+  }, [updateOverdueInvoices, invoices.length]); // ✅ Add updateOverdueInvoices too
 
   // Simulate loading
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1500)
-    return () => clearTimeout(timer)
-  }, [])
-
+    const timer = setTimeout(() => setIsLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Check authentication
   if (!isLoaded) {
@@ -462,11 +511,11 @@ const addToHistory = useCallback(
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
-    )
+    );
   }
 
   if (!isSignedIn) {
-    return <RedirectToSignIn />
+    return <RedirectToSignIn />;
   }
 
   // Email API integration
@@ -668,7 +717,7 @@ const addToHistory = useCallback(
     </div>
   </div>
 </body>
-</html>`
+</html>`,
       };
 
       await sendMail(emailData);
@@ -677,30 +726,39 @@ const addToHistory = useCallback(
       console.error("Error sending email:", error);
       throw error;
     }
-  }
+  };
 
   // Calculate sums with debug logging
-  const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-  const totalVat = invoices.reduce((sum, invoice) => sum + invoice.tax, 0)
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const totalRevenue = invoices.reduce(
+    (sum, invoice) => sum + invoice.amount,
+    0,
+  );
+  const totalVat = invoices.reduce((sum, invoice) => sum + invoice.tax, 0);
+  const totalExpenses = expenses.reduce(
+    (sum, expense) => sum + expense.amount,
+    0,
+  );
 
-  console.log('=== Financial Calculations Debug ===');
-  console.log('Total Revenue (Przychód):', totalRevenue);
-  console.log('Total VAT:', totalVat);
-  console.log('Revenue after VAT:', totalRevenue - totalVat);
-  console.log('Total Expenses:', totalExpenses);
-  console.log('Balance before recurring:', totalRevenue - totalVat - totalExpenses);
+  console.log("=== Financial Calculations Debug ===");
+  console.log("Total Revenue (Przychód):", totalRevenue);
+  console.log("Total VAT:", totalVat);
+  console.log("Revenue after VAT:", totalRevenue - totalVat);
+  console.log("Total Expenses:", totalExpenses);
+  console.log(
+    "Balance before recurring:",
+    totalRevenue - totalVat - totalExpenses,
+  );
 
   // Get current date info
-  const currentDate = new Date()
-  const currentMonth = currentDate.getMonth()
-  const currentYear = currentDate.getFullYear()
-  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1
-  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+  const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
   // Calculate recurring payments
-  console.log('\nRecurring Payments:');
-  recurringPayments.forEach(payment => {
+  console.log("\nRecurring Payments:");
+  recurringPayments.forEach((payment) => {
     if (payment.active) {
       console.log(`Payment: ${payment.name}`);
       console.log(`Amount: ${payment.amount}`);
@@ -710,14 +768,18 @@ const addToHistory = useCallback(
   });
 
   // Calculate total accumulated recurring payments for 6 months
-  const accumulatedRecurring = calculateAccumulatedRecurringPayments(recurringPayments, new Date());
+  const accumulatedRecurring = calculateAccumulatedRecurringPayments(
+    recurringPayments,
+    new Date(),
+  );
 
-  console.log('\nFinal calculations:');
-  console.log('Total accumulated recurring payments:', accumulatedRecurring);
+  console.log("\nFinal calculations:");
+  console.log("Total accumulated recurring payments:", accumulatedRecurring);
 
   // Calculate final income with the properly accumulated recurring payments
-  const netProfit = totalRevenue - totalVat - totalExpenses - accumulatedRecurring;
-  console.log('\nFinal income breakdown:');
+  const netProfit =
+    totalRevenue - totalVat - totalExpenses - accumulatedRecurring;
+  console.log("\nFinal income breakdown:");
   console.log(`Revenue: ${totalRevenue}`);
   console.log(`VAT: ${totalVat}`);
   console.log(`Expenses: ${totalExpenses}`);
@@ -725,93 +787,151 @@ const addToHistory = useCallback(
   console.log(`Final Income: ${netProfit}`);
 
   // Calculate current month's values
-  const currentMonthInvoices = invoices.filter(invoice => {
-    const invoiceDate = new Date(invoice.date)
-    return invoiceDate.getMonth() === currentMonth && invoiceDate.getFullYear() === currentYear
-  })
+  const currentMonthInvoices = invoices.filter((invoice) => {
+    const invoiceDate = new Date(invoice.date);
+    return (
+      invoiceDate.getMonth() === currentMonth &&
+      invoiceDate.getFullYear() === currentYear
+    );
+  });
 
-  const currentMonthExpenses = expenses.filter(expense => {
-    const expenseDate = new Date(expense.date)
-    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear
-  })
+  const currentMonthExpenses = expenses.filter((expense) => {
+    const expenseDate = new Date(expense.date);
+    return (
+      expenseDate.getMonth() === currentMonth &&
+      expenseDate.getFullYear() === currentYear
+    );
+  });
 
   // Calculate current month's recurring payments
   const monthlyRecurring = recurringPayments
-    .filter(p => p.active && p.frequency === 'Miesięcznie')
+    .filter((p) => p.active && p.frequency === "Miesięcznie")
     .reduce((sum, payment) => sum + payment.amount, 0);
 
   // Calculate current month's totals
-  const currentMonthRevenue = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-  const currentMonthVat = currentMonthInvoices.reduce((sum, invoice) => sum + invoice.tax, 0)
-  const currentMonthExpensesTotal = currentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const currentMonthRevenue = currentMonthInvoices.reduce(
+    (sum, invoice) => sum + invoice.amount,
+    0,
+  );
+  const currentMonthVat = currentMonthInvoices.reduce(
+    (sum, invoice) => sum + invoice.tax,
+    0,
+  );
+  const currentMonthExpensesTotal = currentMonthExpenses.reduce(
+    (sum, expense) => sum + expense.amount,
+    0,
+  );
 
   // Calculate current month's income
-  const currentMonthIncome = currentMonthRevenue - currentMonthVat - currentMonthExpensesTotal - monthlyRecurring
+  const currentMonthIncome =
+    currentMonthRevenue -
+    currentMonthVat -
+    currentMonthExpensesTotal -
+    monthlyRecurring;
 
   // Calculate previous month's values
-  const previousMonthInvoices = invoices.filter(invoice => {
-    const invoiceDate = new Date(invoice.date)
-    return invoiceDate.getMonth() === previousMonth && invoiceDate.getFullYear() === previousYear
-  })
+  const previousMonthInvoices = invoices.filter((invoice) => {
+    const invoiceDate = new Date(invoice.date);
+    return (
+      invoiceDate.getMonth() === previousMonth &&
+      invoiceDate.getFullYear() === previousYear
+    );
+  });
 
-  const previousMonthExpenses = expenses.filter(expense => {
-    const expenseDate = new Date(expense.date)
-    return expenseDate.getMonth() === previousMonth && expenseDate.getFullYear() === previousYear
-  })
+  const previousMonthExpenses = expenses.filter((expense) => {
+    const expenseDate = new Date(expense.date);
+    return (
+      expenseDate.getMonth() === previousMonth &&
+      expenseDate.getFullYear() === previousYear
+    );
+  });
 
   // Calculate previous month's recurring payments
   const previousMonthRecurring = recurringPayments
-    .filter(p => p.active && p.frequency === 'Miesięcznie')
+    .filter((p) => p.active && p.frequency === "Miesięcznie")
     .reduce((sum, payment) => sum + payment.amount, 0);
 
-  const previousMonthRevenue = previousMonthInvoices.reduce((sum, invoice) => sum + invoice.amount, 0)
-  const previousMonthVat = previousMonthInvoices.reduce((sum, invoice) => sum + invoice.tax, 0)
-  const previousMonthExpensesTotal = previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const previousMonthIncome = previousMonthRevenue - previousMonthVat - previousMonthExpensesTotal - previousMonthRecurring
+  const previousMonthRevenue = previousMonthInvoices.reduce(
+    (sum, invoice) => sum + invoice.amount,
+    0,
+  );
+  const previousMonthVat = previousMonthInvoices.reduce(
+    (sum, invoice) => sum + invoice.tax,
+    0,
+  );
+  const previousMonthExpensesTotal = previousMonthExpenses.reduce(
+    (sum, expense) => sum + expense.amount,
+    0,
+  );
+  const previousMonthIncome =
+    previousMonthRevenue -
+    previousMonthVat -
+    previousMonthExpensesTotal -
+    previousMonthRecurring;
 
   // Calculate percentage changes
   const calculatePercentageChange = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0
-    return ((current - previous) / previous) * 100
-  }
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
 
-  const revenueChange = calculatePercentageChange(currentMonthRevenue, previousMonthRevenue)
-  const incomeChange = calculatePercentageChange(currentMonthIncome, previousMonthIncome)
-  const expensesChange = calculatePercentageChange(currentMonthExpensesTotal, previousMonthExpensesTotal)
-  const vatChange = calculatePercentageChange(currentMonthVat, previousMonthVat)
+  const revenueChange = calculatePercentageChange(
+    currentMonthRevenue,
+    previousMonthRevenue,
+  );
+  const incomeChange = calculatePercentageChange(
+    currentMonthIncome,
+    previousMonthIncome,
+  );
+  const expensesChange = calculatePercentageChange(
+    currentMonthExpensesTotal,
+    previousMonthExpensesTotal,
+  );
+  const vatChange = calculatePercentageChange(
+    currentMonthVat,
+    previousMonthVat,
+  );
 
   // Format percentage with sign
   const formatPercentageChange = (change: number) => {
-    const sign = change >= 0 ? '+' : ''
-    return `${sign}${change.toFixed(1)}% od zeszłego miesiąca`
-  }
+    const sign = change >= 0 ? "+" : "";
+    return `${sign}${change.toFixed(1)}% od zeszłego miesiąca`;
+  };
 
   // Funkcje filtrowania
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
       invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || invoice.status.toLowerCase() === statusFilter
-    return matchesSearch && matchesStatus
-  })
+      invoice.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || invoice.status.toLowerCase() === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch = expense.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = categoryFilter === "all" || expense.category.toLowerCase() === categoryFilter.toLowerCase()
-    return matchesSearch && matchesCategory
-  })
+    const matchesSearch = expense.description
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      categoryFilter === "all" ||
+      expense.category.toLowerCase() === categoryFilter.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
 
   const filteredOffers = offers.filter((offer) => {
     const matchesSearch =
       offer.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.client.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  })
+      offer.client.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
 
   // Add this function to handle status change
-  const handleStatusChange = async (invoiceId: string, newStatus: InvoiceStatus) => {
+  const handleStatusChange = async (
+    invoiceId: string,
+    newStatus: InvoiceStatus,
+  ) => {
     try {
-      const invoice = invoices.find(i => i.id === invoiceId);
+      const invoice = invoices.find((i) => i.id === invoiceId);
       await changeInvoiceStatus(invoiceId, newStatus);
       await addToHistory(
         "Edytowano",
@@ -835,7 +955,7 @@ const addToHistory = useCallback(
   // Add this function to handle invoice deletion
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
-      const invoice = invoices.find(i => i.id === invoiceId);
+      const invoice = invoices.find((i) => i.id === invoiceId);
       await removeInvoice(invoiceId);
       await addToHistory(
         "Usunięto",
@@ -856,41 +976,61 @@ const addToHistory = useCallback(
 
   // Add this function to open PDF modal
   const openPdfModal = (url: string) => {
-    setCurrentPdfUrl(url)
-    setIsPdfModalOpen(true)
-  }
+    setCurrentPdfUrl(url);
+    setIsPdfModalOpen(true);
+  };
 
   // Add this function before handleAddInvoice
-  const validateInvoiceFormat = (invoiceId: string): { isValid: boolean; error?: string } => {
+  const validateInvoiceFormat = (
+    invoiceId: string,
+  ): { isValid: boolean; error?: string } => {
     // Split the invoice number into parts
-    const parts = invoiceId.split('/')
+    const parts = invoiceId.split("/");
     if (parts.length !== 3) {
-      return { isValid: false, error: 'Format faktury musi być: numer/miesiąc/rok' }
+      return {
+        isValid: false,
+        error: "Format faktury musi być: numer/miesiąc/rok",
+      };
     }
 
-    const [number, month, year] = parts
+    const [number, month, year] = parts;
 
     // Validate number (must be positive integer)
-    const invoiceNumber = parseInt(number)
-    if (isNaN(invoiceNumber) || invoiceNumber <= 0 || number !== invoiceNumber.toString()) {
-      return { isValid: false, error: 'Numer faktury musi być dodatnią liczbą całkowitą' }
+    const invoiceNumber = parseInt(number);
+    if (
+      isNaN(invoiceNumber) ||
+      invoiceNumber <= 0 ||
+      number !== invoiceNumber.toString()
+    ) {
+      return {
+        isValid: false,
+        error: "Numer faktury musi być dodatnią liczbą całkowitą",
+      };
     }
 
     // Validate month (must be 01-12)
-    const monthNumber = parseInt(month)
-    if (isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12 || month !== monthNumber.toString().padStart(2, '0')) {
-      return { isValid: false, error: 'Miesiąc musi być w formacie 01-12' }
+    const monthNumber = parseInt(month);
+    if (
+      isNaN(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12 ||
+      month !== monthNumber.toString().padStart(2, "0")
+    ) {
+      return { isValid: false, error: "Miesiąc musi być w formacie 01-12" };
     }
 
     // Validate year (must be a valid year, not in the future)
-    const yearNumber = parseInt(year)
-    const currentYear = new Date().getFullYear()
+    const yearNumber = parseInt(year);
+    const currentYear = new Date().getFullYear();
     if (isNaN(yearNumber) || yearNumber < 2000 || yearNumber > currentYear) {
-      return { isValid: false, error: `Rok musi być pomiędzy 2000 a ${currentYear}` }
+      return {
+        isValid: false,
+        error: `Rok musi być pomiędzy 2000 a ${currentYear}`,
+      };
     }
 
-    return { isValid: true }
-  }
+    return { isValid: true };
+  };
 
   const handleAddInvoice = async () => {
     try {
@@ -899,7 +1039,11 @@ const addToHistory = useCallback(
         toast.error("Nazwa klienta jest wymagana");
         return;
       }
-      if (!newInvoice.amount || isNaN(Number(newInvoice.amount)) || Number(newInvoice.amount) <= 0) {
+      if (
+        !newInvoice.amount ||
+        isNaN(Number(newInvoice.amount)) ||
+        Number(newInvoice.amount) <= 0
+      ) {
         toast.error("Kwota musi być poprawną liczbą większą od 0");
         return;
       }
@@ -907,7 +1051,11 @@ const addToHistory = useCallback(
         toast.error("Termin płatności jest wymagany");
         return;
       }
-      if (!newInvoice.vatRate || isNaN(Number(newInvoice.vatRate)) || Number(newInvoice.vatRate) < 0) {
+      if (
+        !newInvoice.vatRate ||
+        isNaN(Number(newInvoice.vatRate)) ||
+        Number(newInvoice.vatRate) < 0
+      ) {
         toast.error("Stawka VAT musi być poprawną liczbą nieujemną");
         return;
       }
@@ -915,14 +1063,17 @@ const addToHistory = useCallback(
         toast.error("Imię i nazwisko przedstawiciela jest wymagane");
         return;
       }
-      if (!newInvoice.representativeEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newInvoice.representativeEmail)) {
+      if (
+        !newInvoice.representativeEmail.trim() ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newInvoice.representativeEmail)
+      ) {
         toast.error("Poprawny adres email przedstawiciela jest wymagany");
         return;
       }
 
       // Only generate number if user hasn't provided one
-      let invoiceNumber: string = newInvoice.invoiceNumber || '';
-      if (!invoiceNumber || invoiceNumber.trim() === '') {
+      let invoiceNumber: string = newInvoice.invoiceNumber || "";
+      if (!invoiceNumber || invoiceNumber.trim() === "") {
         const generatedNumber = await getNextInvoiceNumber();
         if (!generatedNumber) {
           toast.error("Failed to generate invoice number");
@@ -933,32 +1084,41 @@ const addToHistory = useCallback(
         // Validate custom invoice number format
         const validation = validateInvoiceFormat(invoiceNumber);
         if (!validation.isValid) {
-          toast.error(validation.error || "Nieprawidłowy format numeru faktury");
+          toast.error(
+            validation.error || "Nieprawidłowy format numeru faktury",
+          );
           return;
         }
       }
 
       const invoiceData = {
-  invoiceNumber,
-  date:
-    editingItem?.type === "invoice"
-      ? editingItem.date
-      : new Date().toISOString().split("T")[0],
-  sentDate: editingItem?.type === "invoice" ? editingItem.sentDate : null,
-  client: newInvoice.client,
-  amount: Number.parseFloat(newInvoice.amount),
-  tax: Number.parseFloat(newInvoice.amount) * (Number.parseFloat(newInvoice.vatRate) / 100),
-  vatRate: Number.parseFloat(newInvoice.vatRate),
-  status: editingItem?.type === "invoice" ? editingItem.status : "Stworzona",
-  dueDate: newInvoice.dueDate,
-  representativeName: newInvoice.representativeName,
-  representativeEmail: newInvoice.representativeEmail,
-  representativeGender: newInvoice.representativeGender,
-  pdfUrl: null,
-};
+        invoiceNumber,
+        date:
+          editingItem?.type === "invoice"
+            ? editingItem.date
+            : new Date().toISOString().split("T")[0],
+        sentDate: editingItem?.type === "invoice" ? editingItem.sentDate : null,
+        client: newInvoice.client,
+        amount: Number.parseFloat(newInvoice.amount),
+        tax:
+          Number.parseFloat(newInvoice.amount) *
+          (Number.parseFloat(newInvoice.vatRate) / 100),
+        vatRate: Number.parseFloat(newInvoice.vatRate),
+        status:
+          editingItem?.type === "invoice" ? editingItem.status : "Stworzona",
+        dueDate: newInvoice.dueDate,
+        representativeName: newInvoice.representativeName,
+        representativeEmail: newInvoice.representativeEmail,
+        representativeGender: newInvoice.representativeGender,
+        pdfUrl: null,
+      };
 
       if (editingItem) {
-        await editInvoice(editingItem.id, invoiceData, selectedInvoiceFile || undefined);
+        await editInvoice(
+          editingItem.id,
+          invoiceData,
+          selectedInvoiceFile || undefined,
+        );
         await addToHistory(
           "Edytowano",
           "Faktura",
@@ -972,9 +1132,12 @@ const addToHistory = useCallback(
         );
         toast.success("Invoice updated successfully");
       } else {
-        const newInvoiceRef = await addInvoice(invoiceData, selectedInvoiceFile || undefined);
+        const newInvoiceRef = await addInvoice(
+          invoiceData,
+          selectedInvoiceFile || undefined,
+        );
         if (!newInvoiceRef?.id) {
-          throw new Error('Failed to create invoice: No ID returned');
+          throw new Error("Failed to create invoice: No ID returned");
         }
         await addToHistory(
           "Dodano",
@@ -1054,7 +1217,7 @@ const addToHistory = useCallback(
       } else {
         const newExpenseRef = await addExpense(expenseData);
         if (!newExpenseRef?.id) {
-          throw new Error('Failed to create expense: No ID returned');
+          throw new Error("Failed to create expense: No ID returned");
         }
         await addToHistory(
           "Dodano",
@@ -1130,7 +1293,7 @@ const addToHistory = useCallback(
       } else {
         const newPaymentRef = await addPayment(recurringData);
         if (!newPaymentRef?.id) {
-          throw new Error('Failed to create recurring payment: No ID returned');
+          throw new Error("Failed to create recurring payment: No ID returned");
         }
         await addToHistory(
           "Dodano",
@@ -1147,7 +1310,13 @@ const addToHistory = useCallback(
 
       setIsAddRecurringOpen(false);
       // setIsEditRecurringOpen(false);
-      setNewRecurring({ name: "", amount: "", frequency: "", category: "", nextPayment: "" });
+      setNewRecurring({
+        name: "",
+        amount: "",
+        frequency: "",
+        category: "",
+        nextPayment: "",
+      });
       setSelectedRecurringFile(null);
       setEditingItem(null);
     } catch (error) {
@@ -1177,22 +1346,19 @@ const addToHistory = useCallback(
       }
 
       const offerData = {
-  title: newOffer.title,
-  client: newOffer.client,
-  amount: Number.parseFloat(newOffer.amount),
-  expirationDate: newOffer.expirationDate,
-  googleDocsUrl: newOffer.googleDocsUrl,
-  description: newOffer.description || '',
-  status:
-    editingItem?.type === "offer"
-      ? editingItem.status
-      : "Szkic",
-  createdDate:
-    editingItem?.type === "offer"
-      ? editingItem.createdDate
-      : new Date().toISOString().split("T")[0],
-  sentDate: editingItem?.type === "offer" ? editingItem.sentDate : null,
-};
+        title: newOffer.title,
+        client: newOffer.client,
+        amount: Number.parseFloat(newOffer.amount),
+        expirationDate: newOffer.expirationDate,
+        googleDocsUrl: newOffer.googleDocsUrl,
+        description: newOffer.description || "",
+        status: editingItem?.type === "offer" ? editingItem.status : "Szkic",
+        createdDate:
+          editingItem?.type === "offer"
+            ? editingItem.createdDate
+            : new Date().toISOString().split("T")[0],
+        sentDate: editingItem?.type === "offer" ? editingItem.sentDate : null,
+      };
 
       if (editingItem) {
         await editOffer(editingItem.id, offerData);
@@ -1211,7 +1377,7 @@ const addToHistory = useCallback(
       } else {
         const newOfferId = await addOffer(offerData);
         if (!newOfferId) {
-          throw new Error('Failed to create offer: No ID returned');
+          throw new Error("Failed to create offer: No ID returned");
         }
         await addToHistory(
           "Dodano",
@@ -1227,7 +1393,14 @@ const addToHistory = useCallback(
       }
 
       setIsAddOfferOpen(false);
-      setNewOffer({ title: "", client: "", amount: "", expirationDate: "", googleDocsUrl: "", description: "" });
+      setNewOffer({
+        title: "",
+        client: "",
+        amount: "",
+        expirationDate: "",
+        googleDocsUrl: "",
+        description: "",
+      });
       setEditingItem(null);
     } catch (error) {
       console.error("Error handling offer:", error);
@@ -1235,69 +1408,74 @@ const addToHistory = useCallback(
     }
   };
 
-  const handleEdit = (item: Omit<EditableItem, "type">, type: EditableItem["type"]) => {
-  const fullItem = { ...item, type } as EditableItem
-  setEditingItem(fullItem)
+  const handleEdit = (
+    item: Omit<EditableItem, "type">,
+    type: EditableItem["type"],
+  ) => {
+    const fullItem = { ...item, type } as EditableItem;
+    setEditingItem(fullItem);
 
-  if (type === "recurring") {
-    const recurring = fullItem as Extract<EditableItem, { type: "recurring" }>
-    setNewRecurring({
-      name: recurring.name,
-      amount: recurring.amount.toString(),
-      frequency: recurring.frequency,
-      category: recurring.category,
-      nextPayment: recurring.nextPayment,
-    })
-    setIsPaymentDisplayOpen(false)
-    setIsAddRecurringOpen(true)
-  }
+    if (type === "recurring") {
+      const recurring = fullItem as Extract<
+        EditableItem,
+        { type: "recurring" }
+      >;
+      setNewRecurring({
+        name: recurring.name,
+        amount: recurring.amount.toString(),
+        frequency: recurring.frequency,
+        category: recurring.category,
+        nextPayment: recurring.nextPayment,
+      });
+      setIsPaymentDisplayOpen(false);
+      setIsAddRecurringOpen(true);
+    }
 
-  if (type === "invoice") {
-  const invoice = item as Extract<EditableItem, { type: "invoice" }>;
-  setNewInvoice({
-    invoiceNumber: invoice.invoiceNumber,
-    client: invoice.client,
-    amount: invoice.amount.toString(),
-    dueDate: invoice.dueDate,
-    description: invoice.description || "",
-    representativeName: invoice.representativeName,
-    representativeEmail: invoice.representativeEmail,
-    representativeGender: invoice.representativeGender || "male",
-    vatRate: invoice.vatRate.toString(),
-  });
-  setIsAddInvoiceOpen(true);
-}
+    if (type === "invoice") {
+      const invoice = item as Extract<EditableItem, { type: "invoice" }>;
+      setNewInvoice({
+        invoiceNumber: invoice.invoiceNumber,
+        client: invoice.client,
+        amount: invoice.amount.toString(),
+        dueDate: invoice.dueDate,
+        description: invoice.description || "",
+        representativeName: invoice.representativeName,
+        representativeEmail: invoice.representativeEmail,
+        representativeGender: invoice.representativeGender || "male",
+        vatRate: invoice.vatRate.toString(),
+      });
+      setIsAddInvoiceOpen(true);
+    }
 
+    if (type === "expense") {
+      const expense = fullItem as Extract<EditableItem, { type: "expense" }>;
+      setNewExpense({
+        description: expense.description,
+        amount: expense.amount.toString(),
+        category: expense.category,
+        date: expense.date,
+      });
+      setIsAddExpenseOpen(true);
+    }
 
-  if (type === "expense") {
-    const expense = fullItem as Extract<EditableItem, { type: "expense" }>
-    setNewExpense({
-      description: expense.description,
-      amount: expense.amount.toString(),
-      category: expense.category,
-      date: expense.date,
-    })
-    setIsAddExpenseOpen(true)
-  }
-
-  if (type === "offer") {
-    const offer = fullItem as Extract<EditableItem, { type: "offer" }>
-    setNewOffer({
-      title: offer.title,
-      client: offer.client,
-      amount: offer.amount.toString(),
-      expirationDate: offer.expirationDate,
-      googleDocsUrl: offer.googleDocsUrl,
-      description: offer.description || "",
-    })
-    setIsAddOfferOpen(true)
-  }
-}
+    if (type === "offer") {
+      const offer = fullItem as Extract<EditableItem, { type: "offer" }>;
+      setNewOffer({
+        title: offer.title,
+        client: offer.client,
+        amount: offer.amount.toString(),
+        expirationDate: offer.expirationDate,
+        googleDocsUrl: offer.googleDocsUrl,
+        description: offer.description || "",
+      });
+      setIsAddOfferOpen(true);
+    }
+  };
 
   // Update the remindClient function
   const remindClient = async (invoice: Invoice) => {
     setReminderConfirmation({ isOpen: true, invoice });
-  }
+  };
 
   const handleConfirmedReminder = async () => {
     if (!reminderConfirmation.invoice) return;
@@ -1312,17 +1490,19 @@ const addToHistory = useCallback(
         null,
         user,
       );
-      toast.success(`Przypomnienie zostało wysłane do ${reminderConfirmation.invoice.representativeEmail}`);
+      toast.success(
+        `Przypomnienie zostało wysłane do ${reminderConfirmation.invoice.representativeEmail}`,
+      );
     } catch {
       toast.error("Błąd podczas wysyłania przypomnienia");
     } finally {
       setReminderConfirmation({ isOpen: false, invoice: null });
     }
-  }
+  };
 
   const navigateToTab = (tabName: string) => {
-    setActiveTab(tabName)
-  }
+    setActiveTab(tabName);
+  };
 
   // Update revertChange function with proper type handling
   const revertChange = async (historyItem: HistoryEntry) => {
@@ -1332,33 +1512,38 @@ const addToHistory = useCallback(
       // Get the previous state from the history item
       const previousState = historyItem.changes?.before;
       if (!previousState) {
-        toast.error('Nie można cofnąć tej zmiany - brak poprzedniego stanu');
+        toast.error("Nie można cofnąć tej zmiany - brak poprzedniego stanu");
         return;
       }
 
       // Revert based on the type of item
       switch (historyItem.type) {
-        case 'Faktura': {
+        case "Faktura": {
           const invoiceData = previousState as Partial<Invoice>;
           // Ensure status is of the correct type
-          if (invoiceData.status && !["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].includes(invoiceData.status)) {
-            toast.error('Nieprawidłowy status faktury');
+          if (
+            invoiceData.status &&
+            !["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"].includes(
+              invoiceData.status,
+            )
+          ) {
+            toast.error("Nieprawidłowy status faktury");
             return;
           }
           await editInvoice(historyItem.itemId, invoiceData);
           break;
         }
-        case 'Wydatek':
+        case "Wydatek":
           await editExpense(historyItem.itemId, previousState);
           break;
-        case 'Płatność cykliczna':
+        case "Płatność cykliczna":
           await editPayment(historyItem.itemId, previousState);
           break;
-        case 'Oferta':
+        case "Oferta":
           await editOffer(historyItem.itemId, previousState);
           break;
         default:
-          toast.error('Nieznany typ elementu');
+          toast.error("Nieznany typ elementu");
           return;
       }
 
@@ -1375,33 +1560,33 @@ const addToHistory = useCallback(
         user,
       );
 
-      toast.success('Pomyślnie cofnięto zmianę');
+      toast.success("Pomyślnie cofnięto zmianę");
     } catch (error) {
-      console.error('Error reverting change:', error);
-      toast.error('Błąd podczas cofania zmiany');
+      console.error("Error reverting change:", error);
+      toast.error("Błąd podczas cofania zmiany");
     }
   };
 
   const getOfferStatusColor = (status: string) => {
     switch (status) {
       case "Zaakceptowana":
-        return "default"
+        return "default";
       case "Wysłana":
-        return "secondary"
+        return "secondary";
       case "Szkic":
-        return "outline"
+        return "outline";
       case "Odrzucona":
-        return "destructive"
+        return "destructive";
       default:
-        return "secondary"
+        return "secondary";
     }
-  }
+  };
 
   const getExpirationColor = (days: number) => {
-    if (days <= 3) return "text-red-500"
-    if (days <= 7) return "text-yellow-500"
-    return "text-green-500"
-  }
+    if (days <= 3) return "text-red-500";
+    if (days <= 7) return "text-yellow-500";
+    return "text-green-500";
+  };
 
   // Check authentication
   if (!isLoaded) {
@@ -1409,17 +1594,17 @@ const addToHistory = useCallback(
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
-    )
+    );
   }
 
   if (!isSignedIn) {
-    return <RedirectToSignIn />
+    return <RedirectToSignIn />;
   }
 
   // Add handleDeleteExpense function
   const handleDeleteExpense = async (expenseId: string) => {
     try {
-      const expense = expenses.find(e => e.id === expenseId);
+      const expense = expenses.find((e) => e.id === expenseId);
       await removeExpense(expenseId);
       await addToHistory(
         "Usunięto",
@@ -1441,7 +1626,7 @@ const addToHistory = useCallback(
   // Add handleDeleteRecurring function
   const handleDeleteRecurring = async (paymentId: string) => {
     try {
-      const payment = recurringPayments.find(p => p.id === paymentId);
+      const payment = recurringPayments.find((p) => p.id === paymentId);
       await removePayment(paymentId);
       await addToHistory(
         "Usunięto",
@@ -1463,20 +1648,22 @@ const addToHistory = useCallback(
   // Add handleToggleRecurring function
   const handleToggleRecurring = async (paymentId: string, active: boolean) => {
     try {
-      const payment = recurringPayments.find(p => p.id === paymentId);
+      const payment = recurringPayments.find((p) => p.id === paymentId);
       await togglePaymentStatus(paymentId, active);
       await addToHistory(
         "Edytowano",
         "Płatność cykliczna",
         paymentId,
-        `${active ? 'Aktywowano' : 'Dezaktywowano'} płatność cykliczną: ${payment?.name}`,
+        `${active ? "Aktywowano" : "Dezaktywowano"} płatność cykliczną: ${payment?.name}`,
         {
           before: { active: !active },
           after: { active },
         },
         user,
       );
-      toast.success(`Recurring payment ${active ? 'activated' : 'deactivated'} successfully`);
+      toast.success(
+        `Recurring payment ${active ? "activated" : "deactivated"} successfully`,
+      );
     } catch (error) {
       console.error("Error toggling recurring payment:", error);
       toast.error("Failed to toggle recurring payment status");
@@ -1484,10 +1671,12 @@ const addToHistory = useCallback(
   };
 
   // Update the filtered payments to use the new type
-  const filteredRecurringPayments = recurringPayments.filter(payment => {
-    const matchesSearch = payment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredRecurringPayments = recurringPayments.filter((payment) => {
+    const matchesSearch =
+      payment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || payment.category === categoryFilter;
+    const matchesCategory =
+      categoryFilter === "all" || payment.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -1500,7 +1689,7 @@ const addToHistory = useCallback(
   // Add handleDeleteOffer function
   const handleDeleteOffer = async (offerId: string) => {
     try {
-      const offer = offers.find(o => o.id === offerId);
+      const offer = offers.find((o) => o.id === offerId);
       await removeOffer(offerId);
       await addToHistory(
         "Usunięto",
@@ -1520,9 +1709,12 @@ const addToHistory = useCallback(
   };
 
   // Add handleOfferStatusChange function
-  const handleOfferStatusChange = async (offerId: string, newStatus: 'Szkic' | 'Wysłana' | 'Zaakceptowana' | 'Odrzucona') => {
+  const handleOfferStatusChange = async (
+    offerId: string,
+    newStatus: "Szkic" | "Wysłana" | "Zaakceptowana" | "Odrzucona",
+  ) => {
     try {
-      const offer = offers.find(o => o.id === offerId);
+      const offer = offers.find((o) => o.id === offerId);
       await changeOfferStatus(offerId, newStatus);
       await addToHistory(
         "Edytowano",
@@ -1542,8 +1734,6 @@ const addToHistory = useCallback(
     }
   };
 
-
-
   return (
     <div className="min-h-screen bg-background">
       {/* Nagłówek */}
@@ -1551,26 +1741,42 @@ const addToHistory = useCallback(
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Panel Finansowy</h1>
-              <p className="text-muted-foreground">Zarządzaj przychodami, wydatkami i analizami finansowymi</p>
+              <h1 className="text-3xl font-bold tracking-tight">
+                Panel Finansowy
+              </h1>
+              <p className="text-muted-foreground">
+                Zarządzaj przychodami, wydatkami i analizami finansowymi
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground">Witaj, {user?.firstName || user?.fullName}</span>
+                <span className="text-sm text-muted-foreground">
+                  Witaj, {user?.firstName || user?.fullName}
+                </span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+                    <Button
+                      variant="ghost"
+                      className="relative h-10 w-10 rounded-full p-0"
+                    >
                       <Image
                         className="h-10 w-10 rounded-full object-cover border-2 border-border"
-                        src={user?.imageUrl || "/placeholder.svg?height=40&width=40"}
+                        src={
+                          user?.imageUrl ||
+                          "/placeholder.svg?height=40&width=40"
+                        }
                         alt={user?.fullName || "User"}
+                        width={40}
+                        height={40}
                       />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.fullName}</p>
+                        <p className="text-sm font-medium leading-none">
+                          {user?.fullName}
+                        </p>
                         <p className="text-xs leading-none text-muted-foreground">
                           {user?.primaryEmailAddress?.emailAddress}
                         </p>
@@ -1611,47 +1817,82 @@ const addToHistory = useCallback(
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="dashboard" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="dashboard"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Panel główny
             </TabsTrigger>
-            <TabsTrigger value="invoices" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="invoices"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Faktury
             </TabsTrigger>
-            <TabsTrigger value="expenses" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="expenses"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Wydatki
             </TabsTrigger>
-            <TabsTrigger value="offers" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="offers"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Oferty
             </TabsTrigger>
-            <TabsTrigger value="recurring" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="recurring"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Płatności cykliczne
             </TabsTrigger>
-            <TabsTrigger value="history" className="transition-all duration-200 hover:bg-accent">
+            <TabsTrigger
+              value="history"
+              className="transition-all duration-200 hover:bg-accent"
+            >
               Historia
             </TabsTrigger>
           </TabsList>
 
           {/* Panel główny */}
-          <TabsContent value="dashboard" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="dashboard"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             {/* Karty podsumowania finansowego */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Przychód</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Przychód
+                  </CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold">{totalRevenue.toLocaleString()} zł</div>
+                    <div className="text-2xl font-bold">
+                      {totalRevenue.toLocaleString()} zł
+                    </div>
                   )}
-                  <p className={cn(
-                    "text-xs",
-                    revenueChange > 0 ? "text-green-600" : revenueChange < 0 ? "text-red-600" : "text-muted-foreground"
-                  )}>
+                  <p
+                    className={cn(
+                      "text-xs",
+                      revenueChange > 0
+                        ? "text-green-600"
+                        : revenueChange < 0
+                          ? "text-red-600"
+                          : "text-muted-foreground",
+                    )}
+                  >
                     {formatPercentageChange(revenueChange)}
                   </p>
                 </CardContent>
@@ -1665,12 +1906,20 @@ const addToHistory = useCallback(
                   {isLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold">{netProfit.toLocaleString()} zł</div>
+                    <div className="text-2xl font-bold">
+                      {netProfit.toLocaleString()} zł
+                    </div>
                   )}
-                  <p className={cn(
-                    "text-xs",
-                    incomeChange > 0 ? "text-green-600" : incomeChange < 0 ? "text-red-600" : "text-muted-foreground"
-                  )}>
+                  <p
+                    className={cn(
+                      "text-xs",
+                      incomeChange > 0
+                        ? "text-green-600"
+                        : incomeChange < 0
+                          ? "text-red-600"
+                          : "text-muted-foreground",
+                    )}
+                  >
                     {formatPercentageChange(incomeChange)}
                   </p>
                 </CardContent>
@@ -1685,12 +1934,20 @@ const addToHistory = useCallback(
                     <Skeleton className="h-8 w-24" />
                   ) : (
                     <>
-                      <div className="text-2xl font-bold">{totalExpenses.toLocaleString()} zł</div>
+                      <div className="text-2xl font-bold">
+                        {totalExpenses.toLocaleString()} zł
+                      </div>
                       <div className="flex flex-row gap-2">
-                        <p className={cn(
-                          "text-xs",
-                          expensesChange > 0 ? "text-red-600" : expensesChange < 0 ? "text-green-600" : "text-muted-foreground"
-                        )}>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            expensesChange > 0
+                              ? "text-red-600"
+                              : expensesChange < 0
+                                ? "text-green-600"
+                                : "text-muted-foreground",
+                          )}
+                        >
                           {formatPercentageChange(expensesChange)}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -1711,11 +1968,19 @@ const addToHistory = useCallback(
                     <Skeleton className="h-8 w-24" />
                   ) : (
                     <>
-                      <div className="text-2xl font-bold">{totalVat.toLocaleString()} zł</div>
-                      <p className={cn(
-                        "text-xs",
-                        vatChange > 0 ? "text-red-600" : vatChange < 0 ? "text-green-600" : "text-muted-foreground"
-                      )}>
+                      <div className="text-2xl font-bold">
+                        {totalVat.toLocaleString()} zł
+                      </div>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          vatChange > 0
+                            ? "text-red-600"
+                            : vatChange < 0
+                              ? "text-green-600"
+                              : "text-muted-foreground",
+                        )}
+                      >
                         {formatPercentageChange(vatChange)}
                       </p>
                     </>
@@ -1729,16 +1994,22 @@ const addToHistory = useCallback(
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader>
                   <CardTitle>Przychody vs Wydatki</CardTitle>
-                  <CardDescription>Miesięczne porównanie dochodów i wydatków</CardDescription>
+                  <CardDescription>
+                    Miesięczne porównanie dochodów i wydatków
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>{isLoading ? <LoadingSkeleton /> : <RevenueChart />}</CardContent>
+                <CardContent>
+                  {isLoading ? <LoadingSkeleton /> : <RevenueChart />}
+                </CardContent>
               </Card>
               <Card className="transition-all duration-200 hover:shadow-md">
                 <CardHeader>
                   <CardTitle>Podział wydatków</CardTitle>
                   <CardDescription>Wydatki według kategorii</CardDescription>
                 </CardHeader>
-                <CardContent>{isLoading ? <LoadingSkeleton /> : <ExpenseChart />}</CardContent>
+                <CardContent>
+                  {isLoading ? <LoadingSkeleton /> : <ExpenseChart />}
+                </CardContent>
               </Card>
             </div>
 
@@ -1764,15 +2035,28 @@ const addToHistory = useCallback(
                   ) : (
                     <div className="space-y-2">
                       {invoices.slice(0, 3).map((invoice) => (
-                        <div key={invoice.id} className="flex items-center justify-between">
+                        <div
+                          key={invoice.id}
+                          className="flex items-center justify-between"
+                        >
                           <div>
-                            <p className="font-medium">{invoice.invoiceNumber}</p>
-                            <p className="text-sm text-muted-foreground">{invoice.client}</p>
+                            <p className="font-medium">
+                              {invoice.invoiceNumber}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {invoice.client}
+                            </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">{invoice.amount.toLocaleString()} zł</p>
+                            <p className="font-medium">
+                              {invoice.amount.toLocaleString()} zł
+                            </p>
                             <Badge
-                              variant={invoice.status === "Zapłacona" ? "default" : "secondary"}
+                              variant={
+                                invoice.status === "Zapłacona"
+                                  ? "default"
+                                  : "secondary"
+                              }
                               className="text-xs"
                             >
                               {invoice.status}
@@ -1808,11 +2092,17 @@ const addToHistory = useCallback(
                         <div key={expense.id}>
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="font-medium">{expense.description}</p>
-                              <p className="text-sm text-muted-foreground">{expense.date}</p>
+                              <p className="font-medium">
+                                {expense.description}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {expense.date}
+                              </p>
                             </div>
                             <div className="text-right">
-                              <p className="font-medium">{expense.amount.toLocaleString()} zł</p>
+                              <p className="font-medium">
+                                {expense.amount.toLocaleString()} zł
+                              </p>
                               <Badge variant="outline" className="text-xs">
                                 {expense.category}
                               </Badge>
@@ -1853,10 +2143,14 @@ const addToHistory = useCallback(
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="font-medium">{payment.name}</p>
-                                <p className="text-sm text-muted-foreground">Następna: {payment.nextPayment}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Następna: {payment.nextPayment}
+                                </p>
                               </div>
                               <div className="text-right">
-                                <p className="font-medium">{payment.amount} zł</p>
+                                <p className="font-medium">
+                                  {payment.amount} zł
+                                </p>
                                 <Badge variant="outline" className="text-xs">
                                   {payment.frequency}
                                 </Badge>
@@ -1873,7 +2167,10 @@ const addToHistory = useCallback(
           </TabsContent>
 
           {/* Faktury */}
-          <TabsContent value="invoices" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="invoices"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Faktury</h2>
               <div className="flex items-center gap-2">
@@ -1893,24 +2190,40 @@ const addToHistory = useCallback(
                     <SelectItem value="stworzona">Stworzona</SelectItem>
                     <SelectItem value="wysłana">Wysłana</SelectItem>
                     <SelectItem value="zapłacona">Zapłacona</SelectItem>
-                    <SelectItem value="przeterminowana">Przeterminowana</SelectItem>
+                    <SelectItem value="przeterminowana">
+                      Przeterminowana
+                    </SelectItem>
                   </SelectContent>
                 </Select>
-                <Dialog open={isAddInvoiceOpen} onOpenChange={setIsAddInvoiceOpen}>
+                <Dialog
+                  open={isAddInvoiceOpen}
+                  onOpenChange={setIsAddInvoiceOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="transition-all duration-200 hover:scale-105">
+                    <Button
+                      size="sm"
+                      className="transition-all duration-200 hover:scale-105"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Dodaj fakturę
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddInvoice();
-                    }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAddInvoice();
+                      }}
+                    >
                       <DialogHeader>
-                        <DialogTitle>{editingItem ? "Edytuj fakturę" : "Dodaj nową fakturę"}</DialogTitle>
-                        <DialogDescription>Wprowadź szczegóły faktury i opcjonalnie prześlij PDF</DialogDescription>
+                        <DialogTitle>
+                          {editingItem
+                            ? "Edytuj fakturę"
+                            : "Dodaj nową fakturę"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Wprowadź szczegóły faktury i opcjonalnie prześlij PDF
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -1919,9 +2232,16 @@ const addToHistory = useCallback(
                             id="invoiceNumber"
                             placeholder={nextInvoiceNumber}
                             value={newInvoice.invoiceNumber}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, invoiceNumber: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                invoiceNumber: e.target.value,
+                              })
+                            }
                           />
-                          <p className="text-xs text-muted-foreground">Pozostaw puste, aby użyć automatycznego numeru</p>
+                          <p className="text-xs text-muted-foreground">
+                            Pozostaw puste, aby użyć automatycznego numeru
+                          </p>
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="client">Klient</Label>
@@ -1929,7 +2249,12 @@ const addToHistory = useCallback(
                             id="client"
                             placeholder="Nazwa klienta"
                             value={newInvoice.client}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                client: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -1939,7 +2264,12 @@ const addToHistory = useCallback(
                             type="number"
                             placeholder="0.00"
                             value={newInvoice.amount}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                amount: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -1949,7 +2279,12 @@ const addToHistory = useCallback(
                             type="number"
                             placeholder="8"
                             value={newInvoice.vatRate}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, vatRate: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                vatRate: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -1958,7 +2293,12 @@ const addToHistory = useCallback(
                             id="dueDate"
                             type="date"
                             value={newInvoice.dueDate}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                dueDate: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -1967,23 +2307,42 @@ const addToHistory = useCallback(
                             id="description"
                             placeholder="Opis faktury"
                             value={newInvoice.description}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, description: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                description: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="representativeName">Przedstawiciel firmy (wołacz)</Label>
+                          <Label htmlFor="representativeName">
+                            Przedstawiciel firmy (wołacz)
+                          </Label>
                           <Input
                             id="representativeName"
                             placeholder="Imię i nazwisko w wołaczu"
                             value={newInvoice.representativeName}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, representativeName: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                representativeName: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="representativeGender">Płeć przedstawiciela</Label>
+                          <Label htmlFor="representativeGender">
+                            Płeć przedstawiciela
+                          </Label>
                           <Select
                             value={newInvoice.representativeGender}
-                            onValueChange={(value) => setNewInvoice({ ...newInvoice, representativeGender: value })}
+                            onValueChange={(value) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                representativeGender: value,
+                              })
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Wybierz płeć" />
@@ -1995,30 +2354,49 @@ const addToHistory = useCallback(
                           </Select>
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="representativeEmail">Email przedstawiciela</Label>
+                          <Label htmlFor="representativeEmail">
+                            Email przedstawiciela
+                          </Label>
                           <Input
                             id="representativeEmail"
                             type="email"
                             placeholder="email@firma.com"
                             value={newInvoice.representativeEmail}
-                            onChange={(e) => setNewInvoice({ ...newInvoice, representativeEmail: e.target.value })}
+                            onChange={(e) =>
+                              setNewInvoice({
+                                ...newInvoice,
+                                representativeEmail: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <Separator />
                         <div className="grid gap-2">
-                          <Label htmlFor="invoice-pdf">PDF faktury (opcjonalnie)</Label>
+                          <Label htmlFor="invoice-pdf">
+                            PDF faktury (opcjonalnie)
+                          </Label>
                           <Input
                             id="invoice-pdf"
                             type="file"
                             accept=".pdf"
-                            onChange={(e) => setSelectedInvoiceFile(e.target.files?.[0] || null)}
+                            onChange={(e) =>
+                              setSelectedInvoiceFile(
+                                e.target.files?.[0] || null,
+                              )
+                            }
                           />
                           {selectedInvoiceFile && (
                             <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
                               <div>
                                 <p>Wybrany plik: {selectedInvoiceFile.name}</p>
                                 <p className="text-muted-foreground">
-                                  Rozmiar: {(selectedInvoiceFile.size / 1024 / 1024).toFixed(2)} MB
+                                  Rozmiar:{" "}
+                                  {(
+                                    selectedInvoiceFile.size /
+                                    1024 /
+                                    1024
+                                  ).toFixed(2)}{" "}
+                                  MB
                                 </p>
                               </div>
                               <Button
@@ -2034,7 +2412,10 @@ const addToHistory = useCallback(
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                        <Button
+                          type="submit"
+                          className="transition-all duration-200 hover:scale-105"
+                        >
                           {editingItem ? "Zapisz zmiany" : "Dodaj fakturę"}
                         </Button>
                       </DialogFooter>
@@ -2060,8 +2441,13 @@ const addToHistory = useCallback(
               </TableHeader>
               <TableBody>
                 {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                  <TableRow
+                    key={invoice.id}
+                    className="transition-all duration-200 hover:bg-muted/50"
+                  >
+                    <TableCell className="font-medium">
+                      {invoice.invoiceNumber}
+                    </TableCell>
                     <TableCell>{invoice.sentDate || "-"}</TableCell>
                     <TableCell>{invoice.client}</TableCell>
                     <TableCell>{invoice.amount.toLocaleString()} zł</TableCell>
@@ -2087,7 +2473,14 @@ const addToHistory = useCallback(
                           </Badge>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-2 grid gap-1">
-                          {(["Stworzona", "Wysłana", "Zapłacona", "Przeterminowana"] as InvoiceStatus[]).map((status) => (
+                          {(
+                            [
+                              "Stworzona",
+                              "Wysłana",
+                              "Zapłacona",
+                              "Przeterminowana",
+                            ] as InvoiceStatus[]
+                          ).map((status) => (
                             <Badge
                               key={status}
                               variant={
@@ -2101,9 +2494,12 @@ const addToHistory = useCallback(
                               }
                               className={cn(
                                 "cursor-pointer hover:opacity-80 justify-center",
-                                status === invoice.status && "opacity-50 pointer-events-none"
+                                status === invoice.status &&
+                                  "opacity-50 pointer-events-none",
                               )}
-                              onClick={() => handleStatusChange(invoice.id, status)}
+                              onClick={() =>
+                                handleStatusChange(invoice.id, status)
+                              }
                             >
                               {status}
                             </Badge>
@@ -2113,11 +2509,17 @@ const addToHistory = useCallback(
                     </TableCell>
                     <TableCell>
                       {invoice.pdfUrl ? (
-                        <Button variant="ghost" size="sm" onClick={() => openPdfModal(invoice.pdfUrl!)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openPdfModal(invoice.pdfUrl!)}
+                        >
                           <FileText className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <span className="text-muted-foreground text-sm">Brak</span>
+                        <span className="text-muted-foreground text-sm">
+                          Brak
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -2158,7 +2560,10 @@ const addToHistory = useCallback(
           </TabsContent>
 
           {/* Wydatki */}
-          <TabsContent value="expenses" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="expenses"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Wydatki</h2>
               <div className="flex items-center gap-2">
@@ -2169,7 +2574,10 @@ const addToHistory = useCallback(
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-[350px]"
                 />
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <Select
+                  value={categoryFilter}
+                  onValueChange={setCategoryFilter}
+                >
                   <SelectTrigger className="w-[250px]">
                     <SelectValue placeholder="Filtruj kategorię" />
                   </SelectTrigger>
@@ -2182,21 +2590,35 @@ const addToHistory = useCallback(
                     <SelectItem value="podróże">Podróże</SelectItem>
                   </SelectContent>
                 </Select>
-                <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+                <Dialog
+                  open={isAddExpenseOpen}
+                  onOpenChange={setIsAddExpenseOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="transition-all duration-200 hover:scale-105">
+                    <Button
+                      size="sm"
+                      className="transition-all duration-200 hover:scale-105"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Dodaj wydatek
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddExpense();
-                    }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAddExpense();
+                      }}
+                    >
                       <DialogHeader>
-                        <DialogTitle>{editingItem ? "Edytuj wydatek" : "Dodaj nowy wydatek"}</DialogTitle>
-                        <DialogDescription>Wprowadź szczegóły wydatku i opcjonalnie prześlij PDF</DialogDescription>
+                        <DialogTitle>
+                          {editingItem
+                            ? "Edytuj wydatek"
+                            : "Dodaj nowy wydatek"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Wprowadź szczegóły wydatku i opcjonalnie prześlij PDF
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -2205,7 +2627,12 @@ const addToHistory = useCallback(
                             id="date"
                             type="date"
                             value={newExpense.date}
-                            onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+                            onChange={(e) =>
+                              setNewExpense({
+                                ...newExpense,
+                                date: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -2214,7 +2641,12 @@ const addToHistory = useCallback(
                             id="description"
                             placeholder="Opis wydatku"
                             value={newExpense.description}
-                            onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                            onChange={(e) =>
+                              setNewExpense({
+                                ...newExpense,
+                                description: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -2224,22 +2656,35 @@ const addToHistory = useCallback(
                             type="number"
                             placeholder="0.00"
                             value={newExpense.amount}
-                            onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                            onChange={(e) =>
+                              setNewExpense({
+                                ...newExpense,
+                                amount: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="category">Kategoria</Label>
                           <Select
                             value={newExpense.category}
-                            onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}
+                            onValueChange={(value) =>
+                              setNewExpense({ ...newExpense, category: value })
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Wybierz kategorię" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Operacyjne">Operacyjne</SelectItem>
-                              <SelectItem value="Marketing">Marketing</SelectItem>
-                              <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
+                              <SelectItem value="Operacyjne">
+                                Operacyjne
+                              </SelectItem>
+                              <SelectItem value="Marketing">
+                                Marketing
+                              </SelectItem>
+                              <SelectItem value="Subskrypcje">
+                                Subskrypcje
+                              </SelectItem>
                               <SelectItem value="Sprzęt">Sprzęt</SelectItem>
                               <SelectItem value="Podróże">Podróże</SelectItem>
                             </SelectContent>
@@ -2247,19 +2692,31 @@ const addToHistory = useCallback(
                         </div>
                         <Separator />
                         <div className="grid gap-2">
-                          <Label htmlFor="expense-pdf">PDF wydatku (opcjonalnie)</Label>
+                          <Label htmlFor="expense-pdf">
+                            PDF wydatku (opcjonalnie)
+                          </Label>
                           <Input
                             id="expense-pdf"
                             type="file"
                             accept=".pdf"
-                            onChange={(e) => setSelectedExpenseFile(e.target.files?.[0] || null)}
+                            onChange={(e) =>
+                              setSelectedExpenseFile(
+                                e.target.files?.[0] || null,
+                              )
+                            }
                           />
                           {selectedExpenseFile && (
                             <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
                               <div>
                                 <p>Wybrany plik: {selectedExpenseFile.name}</p>
                                 <p className="text-muted-foreground">
-                                  Rozmiar: {(selectedExpenseFile.size / 1024 / 1024).toFixed(2)} MB
+                                  Rozmiar:{" "}
+                                  {(
+                                    selectedExpenseFile.size /
+                                    1024 /
+                                    1024
+                                  ).toFixed(2)}{" "}
+                                  MB
                                 </p>
                               </div>
                               <Button
@@ -2275,7 +2732,10 @@ const addToHistory = useCallback(
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                        <Button
+                          type="submit"
+                          className="transition-all duration-200 hover:scale-105"
+                        >
                           {editingItem ? "Zapisz zmiany" : "Dodaj wydatek"}
                         </Button>
                       </DialogFooter>
@@ -2305,49 +2765,67 @@ const addToHistory = useCallback(
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">{expense.date}</TableCell>
-                    <TableCell>{expense.description}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>{expense.amount.toLocaleString()} zł</TableCell>
-                    <TableCell>
-                      {expense.pdfUrl ? (
-                        <Button variant="ghost" size="sm" onClick={() => openPdfModal(expense.pdfUrl!)}>
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Brak</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(expense, "expense")}
-                          className="transition-all duration-200 hover:scale-105"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteExpense(expense.id)}
-                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                ) : (
+                  filteredExpenses.map((expense) => (
+                    <TableRow
+                      key={expense.id}
+                      className="transition-all duration-200 hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">
+                        {expense.date}
+                      </TableCell>
+                      <TableCell>{expense.description}</TableCell>
+                      <TableCell>{expense.category}</TableCell>
+                      <TableCell>
+                        {expense.amount.toLocaleString()} zł
+                      </TableCell>
+                      <TableCell>
+                        {expense.pdfUrl ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPdfModal(expense.pdfUrl!)}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            Brak
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(expense, "expense")}
+                            className="transition-all duration-200 hover:scale-105"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteExpense(expense.id)}
+                            className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TabsContent>
 
           {/* Oferty */}
-          <TabsContent value="offers" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="offers"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Oferty</h2>
               <div className="flex items-center gap-2">
@@ -2359,15 +2837,22 @@ const addToHistory = useCallback(
                 />
                 <Dialog open={isAddOfferOpen} onOpenChange={setIsAddOfferOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className="transition-all duration-200 hover:scale-105">
+                    <Button
+                      size="sm"
+                      className="transition-all duration-200 hover:scale-105"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Dodaj ofertę
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
                     <DialogHeader>
-                      <DialogTitle>{editingItem ? "Edytuj ofertę" : "Dodaj nową ofertę"}</DialogTitle>
-                      <DialogDescription>Wprowadź szczegóły oferty</DialogDescription>
+                      <DialogTitle>
+                        {editingItem ? "Edytuj ofertę" : "Dodaj nową ofertę"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Wprowadź szczegóły oferty
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid gap-2">
@@ -2376,7 +2861,9 @@ const addToHistory = useCallback(
                           id="title"
                           placeholder="Tytuł oferty"
                           value={newOffer.title}
-                          onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({ ...newOffer, title: e.target.value })
+                          }
                         />
                       </div>
                       <div className="grid gap-2">
@@ -2385,7 +2872,9 @@ const addToHistory = useCallback(
                           id="client"
                           placeholder="Nazwa klienta"
                           value={newOffer.client}
-                          onChange={(e) => setNewOffer({ ...newOffer, client: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({ ...newOffer, client: e.target.value })
+                          }
                         />
                       </div>
                       <div className="grid gap-2">
@@ -2395,7 +2884,9 @@ const addToHistory = useCallback(
                           type="number"
                           placeholder="0.00"
                           value={newOffer.amount}
-                          onChange={(e) => setNewOffer({ ...newOffer, amount: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({ ...newOffer, amount: e.target.value })
+                          }
                         />
                       </div>
                       <div className="grid gap-2">
@@ -2404,17 +2895,29 @@ const addToHistory = useCallback(
                           id="expirationDate"
                           type="date"
                           value={newOffer.expirationDate}
-                          onChange={(e) => setNewOffer({ ...newOffer, expirationDate: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({
+                              ...newOffer,
+                              expirationDate: e.target.value,
+                            })
+                          }
                         />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="googleDocsUrl">Link do Google Docs</Label>
+                        <Label htmlFor="googleDocsUrl">
+                          Link do Google Docs
+                        </Label>
                         <Input
                           id="googleDocsUrl"
                           type="url"
                           placeholder="docs.google.com/document/..."
                           value={newOffer.googleDocsUrl}
-                          onChange={(e) => setNewOffer({ ...newOffer, googleDocsUrl: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({
+                              ...newOffer,
+                              googleDocsUrl: e.target.value,
+                            })
+                          }
                         />
                       </div>
                       <div className="grid gap-2">
@@ -2423,12 +2926,20 @@ const addToHistory = useCallback(
                           id="description"
                           placeholder="Opis oferty"
                           value={newOffer.description}
-                          onChange={(e) => setNewOffer({ ...newOffer, description: e.target.value })}
+                          onChange={(e) =>
+                            setNewOffer({
+                              ...newOffer,
+                              description: e.target.value,
+                            })
+                          }
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={handleAddOffer} className="transition-all duration-200 hover:scale-105">
+                      <Button
+                        onClick={handleAddOffer}
+                        className="transition-all duration-200 hover:scale-105"
+                      >
                         {editingItem ? "Zapisz zmiany" : "Dodaj ofertę"}
                       </Button>
                     </DialogFooter>
@@ -2458,70 +2969,94 @@ const addToHistory = useCallback(
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredOffers.map((offer) => (
-                  <TableRow key={offer.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">{offer.title}</TableCell>
-                    <TableCell>{offer.client}</TableCell>
-                    <TableCell>{offer.amount.toLocaleString()} zł</TableCell>
-                    <TableCell>{offer.createdDate}</TableCell>
-                    <TableCell>
-                      <span className={getExpirationColor(offer.daysToExpiration)}>{offer.daysToExpiration} dni</span>
-                    </TableCell>
-                    <TableCell>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Badge
-                            variant={getOfferStatusColor(offer.status)}
-                            className="cursor-pointer hover:opacity-80"
-                          >
-                            {offer.status}
-                          </Badge>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-2 grid gap-1">
-                          {(['Szkic', 'Wysłana', 'Zaakceptowana', 'Odrzucona'] as const).map((status) => (
+                ) : (
+                  filteredOffers.map((offer) => (
+                    <TableRow
+                      key={offer.id}
+                      className="transition-all duration-200 hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">
+                        {offer.title}
+                      </TableCell>
+                      <TableCell>{offer.client}</TableCell>
+                      <TableCell>{offer.amount.toLocaleString()} zł</TableCell>
+                      <TableCell>{offer.createdDate}</TableCell>
+                      <TableCell>
+                        <span
+                          className={getExpirationColor(offer.daysToExpiration)}
+                        >
+                          {offer.daysToExpiration} dni
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Popover>
+                          <PopoverTrigger asChild>
                             <Badge
-                              key={status}
-                              variant={getOfferStatusColor(status)}
-                              className={cn(
-                                "cursor-pointer hover:opacity-80 justify-center",
-                                status === offer.status && "opacity-50 pointer-events-none"
-                              )}
-                              onClick={() => handleOfferStatusChange(offer.id, status)}
+                              variant={getOfferStatusColor(offer.status)}
+                              className="cursor-pointer hover:opacity-80"
                             >
-                              {status}
+                              {offer.status}
                             </Badge>
-                          ))}
-                        </PopoverContent>
-                      </Popover>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(offer, "offer")}
-                          className="transition-all duration-200 hover:scale-105"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteOffer(offer.id)}
-                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-2 grid gap-1">
+                            {(
+                              [
+                                "Szkic",
+                                "Wysłana",
+                                "Zaakceptowana",
+                                "Odrzucona",
+                              ] as const
+                            ).map((status) => (
+                              <Badge
+                                key={status}
+                                variant={getOfferStatusColor(status)}
+                                className={cn(
+                                  "cursor-pointer hover:opacity-80 justify-center",
+                                  status === offer.status &&
+                                    "opacity-50 pointer-events-none",
+                                )}
+                                onClick={() =>
+                                  handleOfferStatusChange(offer.id, status)
+                                }
+                              >
+                                {status}
+                              </Badge>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(offer, "offer")}
+                            className="transition-all duration-200 hover:scale-105"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOffer(offer.id)}
+                            className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TabsContent>
 
           {/* Płatności cykliczne */}
-          <TabsContent value="recurring" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="recurring"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Płatności cykliczne</h2>
               <div className="flex items-center gap-2">
@@ -2532,7 +3067,10 @@ const addToHistory = useCallback(
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-[350px]"
                 />
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <Select
+                  value={categoryFilter}
+                  onValueChange={setCategoryFilter}
+                >
                   <SelectTrigger className="w-[250px]">
                     <SelectValue placeholder="Filtruj kategorię" />
                   </SelectTrigger>
@@ -2543,21 +3081,35 @@ const addToHistory = useCallback(
                     <SelectItem value="Ubezpieczenia">Ubezpieczenia</SelectItem>
                   </SelectContent>
                 </Select>
-                <Dialog open={isAddRecurringOpen} onOpenChange={setIsAddRecurringOpen}>
+                <Dialog
+                  open={isAddRecurringOpen}
+                  onOpenChange={setIsAddRecurringOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button size="sm" className="transition-all duration-200 hover:scale-105">
+                    <Button
+                      size="sm"
+                      className="transition-all duration-200 hover:scale-105"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Dodaj płatność
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddRecurring();
-                    }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAddRecurring();
+                      }}
+                    >
                       <DialogHeader>
-                        <DialogTitle>{editingItem ? "Edytuj płatność" : "Dodaj nową płatność"}</DialogTitle>
-                        <DialogDescription>Wprowadź szczegóły płatności cyklicznej</DialogDescription>
+                        <DialogTitle>
+                          {editingItem
+                            ? "Edytuj płatność"
+                            : "Dodaj nową płatność"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Wprowadź szczegóły płatności cyklicznej
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -2566,7 +3118,12 @@ const addToHistory = useCallback(
                             id="name"
                             placeholder="Nazwa usługi/produktu"
                             value={newRecurring.name}
-                            onChange={(e) => setNewRecurring({ ...newRecurring, name: e.target.value })}
+                            onChange={(e) =>
+                              setNewRecurring({
+                                ...newRecurring,
+                                name: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
@@ -2576,21 +3133,35 @@ const addToHistory = useCallback(
                             type="number"
                             placeholder="0.00"
                             value={newRecurring.amount}
-                            onChange={(e) => setNewRecurring({ ...newRecurring, amount: e.target.value })}
+                            onChange={(e) =>
+                              setNewRecurring({
+                                ...newRecurring,
+                                amount: e.target.value,
+                              })
+                            }
                           />
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="frequency">Częstotliwość</Label>
                           <Select
                             value={newRecurring.frequency}
-                            onValueChange={(value) => setNewRecurring({ ...newRecurring, frequency: value })}
+                            onValueChange={(value) =>
+                              setNewRecurring({
+                                ...newRecurring,
+                                frequency: value,
+                              })
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Wybierz częstotliwość" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Miesięcznie">Miesięcznie</SelectItem>
-                              <SelectItem value="Kwartalnie">Kwartalnie</SelectItem>
+                              <SelectItem value="Miesięcznie">
+                                Miesięcznie
+                              </SelectItem>
+                              <SelectItem value="Kwartalnie">
+                                Kwartalnie
+                              </SelectItem>
                               <SelectItem value="Rocznie">Rocznie</SelectItem>
                             </SelectContent>
                           </Select>
@@ -2599,15 +3170,26 @@ const addToHistory = useCallback(
                           <Label htmlFor="category">Kategoria</Label>
                           <Select
                             value={newRecurring.category}
-                            onValueChange={(value) => setNewRecurring({ ...newRecurring, category: value })}
+                            onValueChange={(value) =>
+                              setNewRecurring({
+                                ...newRecurring,
+                                category: value,
+                              })
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Wybierz kategorię" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Subskrypcje">Subskrypcje</SelectItem>
-                              <SelectItem value="Operacyjne">Operacyjne</SelectItem>
-                              <SelectItem value="Ubezpieczenia">Ubezpieczenia</SelectItem>
+                              <SelectItem value="Subskrypcje">
+                                Subskrypcje
+                              </SelectItem>
+                              <SelectItem value="Operacyjne">
+                                Operacyjne
+                              </SelectItem>
+                              <SelectItem value="Ubezpieczenia">
+                                Ubezpieczenia
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2617,27 +3199,47 @@ const addToHistory = useCallback(
                             id="nextPayment"
                             type="date"
                             value={newRecurring.nextPayment}
-                            onChange={(e) => setNewRecurring({ ...newRecurring, nextPayment: e.target.value })}
+                            onChange={(e) =>
+                              setNewRecurring({
+                                ...newRecurring,
+                                nextPayment: e.target.value,
+                              })
+                            }
                           />
                           <p className="text-xs text-muted-foreground">
-                            Data może być z przeszłości lub przyszłości. System automatycznie obliczy następną płatność.
+                            Data może być z przeszłości lub przyszłości. System
+                            automatycznie obliczy następną płatność.
                           </p>
                         </div>
                         <Separator />
                         <div className="grid gap-2">
-                          <Label htmlFor="recurring-pdf">PDF dokumentu (opcjonalnie)</Label>
+                          <Label htmlFor="recurring-pdf">
+                            PDF dokumentu (opcjonalnie)
+                          </Label>
                           <Input
                             id="recurring-pdf"
                             type="file"
                             accept=".pdf"
-                            onChange={(e) => setSelectedRecurringFile(e.target.files?.[0] || null)}
+                            onChange={(e) =>
+                              setSelectedRecurringFile(
+                                e.target.files?.[0] || null,
+                              )
+                            }
                           />
                           {selectedRecurringFile && (
                             <div className="p-2 bg-muted rounded text-sm flex justify-between items-center">
                               <div>
-                                <p>Wybrany plik: {selectedRecurringFile.name}</p>
+                                <p>
+                                  Wybrany plik: {selectedRecurringFile.name}
+                                </p>
                                 <p className="text-muted-foreground">
-                                  Rozmiar: {(selectedRecurringFile.size / 1024 / 1024).toFixed(2)} MB
+                                  Rozmiar:{" "}
+                                  {(
+                                    selectedRecurringFile.size /
+                                    1024 /
+                                    1024
+                                  ).toFixed(2)}{" "}
+                                  MB
                                 </p>
                               </div>
                               <Button
@@ -2653,7 +3255,10 @@ const addToHistory = useCallback(
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit" className="transition-all duration-200 hover:scale-105">
+                        <Button
+                          type="submit"
+                          className="transition-all duration-200 hover:scale-105"
+                        >
                           {editingItem ? "Zapisz zmiany" : "Dodaj płatność"}
                         </Button>
                       </DialogFooter>
@@ -2685,74 +3290,97 @@ const addToHistory = useCallback(
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredRecurringPayments.map((payment) => (
-                  <TableRow key={payment.id} className="transition-all duration-200 hover:bg-muted/50">
-                    <TableCell className="font-medium">
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto font-medium"
-                        onClick={() => handlePaymentDisplay(payment)}
-                      >
-                        {payment.name}
-                      </Button>
-                    </TableCell>
-                    <TableCell>{payment.amount.toLocaleString()} zł</TableCell>
-                    <TableCell>{payment.frequency}</TableCell>
-                    <TableCell>{payment.category}</TableCell>
-                    <TableCell>
-                      {calculateNextPaymentDate(payment.nextPayment, payment.frequency)}
-                    </TableCell>
-                    <TableCell>
-                      {payment.pdfUrl ? (
-                        <Button variant="ghost" size="sm" onClick={() => openPdfModal(payment.pdfUrl!)}>
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Brak</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="w-[100px]">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={payment.active}
-                          onCheckedChange={(checked) => handleToggleRecurring(payment.id, checked)}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {payment.active ? "Aktywna" : "Nieaktywna"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
+                ) : (
+                  filteredRecurringPayments.map((payment) => (
+                    <TableRow
+                      key={payment.id}
+                      className="transition-all duration-200 hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">
                         <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(payment, "recurring")}
-                          className="transition-all duration-200 hover:scale-105"
+                          variant="link"
+                          className="p-0 h-auto font-medium"
+                          onClick={() => handlePaymentDisplay(payment)}
                         >
-                          <Edit className="h-4 w-4" />
+                          {payment.name}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteRecurring(payment.id)}
-                          className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {payment.amount.toLocaleString()} zł
+                      </TableCell>
+                      <TableCell>{payment.frequency}</TableCell>
+                      <TableCell>{payment.category}</TableCell>
+                      <TableCell>
+                        {calculateNextPaymentDate(
+                          payment.nextPayment,
+                          payment.frequency,
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {payment.pdfUrl ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPdfModal(payment.pdfUrl!)}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            Brak
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="w-[100px]">
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={payment.active}
+                            onCheckedChange={(checked) =>
+                              handleToggleRecurring(payment.id, checked)
+                            }
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {payment.active ? "Aktywna" : "Nieaktywna"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(payment, "recurring")}
+                            className="transition-all duration-200 hover:scale-105"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteRecurring(payment.id)}
+                            className="transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
 
             {/* Add Payment Display Dialog */}
-            <Dialog open={isPaymentDisplayOpen} onOpenChange={setIsPaymentDisplayOpen}>
+            <Dialog
+              open={isPaymentDisplayOpen}
+              onOpenChange={setIsPaymentDisplayOpen}
+            >
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Szczegóły płatności cyklicznej</DialogTitle>
-                  <DialogDescription>Informacje o płatności i historia zmian</DialogDescription>
+                  <DialogDescription>
+                    Informacje o płatności i historia zmian
+                  </DialogDescription>
                 </DialogHeader>
                 {selectedPayment && (
                   <div className="grid gap-4 py-4">
@@ -2763,7 +3391,9 @@ const addToHistory = useCallback(
                           checked={selectedPayment.active}
                           onCheckedChange={(checked) => {
                             handleToggleRecurring(selectedPayment.id, checked);
-                            setSelectedPayment(prev => prev ? { ...prev, active: checked } : null);
+                            setSelectedPayment((prev) =>
+                              prev ? { ...prev, active: checked } : null,
+                            );
                           }}
                         />
                       </div>
@@ -2775,34 +3405,56 @@ const addToHistory = useCallback(
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Kwota</Label>
-                          <p className="font-medium">{selectedPayment.amount.toLocaleString()} zł</p>
+                          <p className="font-medium">
+                            {selectedPayment.amount.toLocaleString()} zł
+                          </p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-muted-foreground">Częstotliwość</Label>
-                          <p className="font-medium">{selectedPayment.frequency}</p>
+                          <Label className="text-muted-foreground">
+                            Częstotliwość
+                          </Label>
+                          <p className="font-medium">
+                            {selectedPayment.frequency}
+                          </p>
                         </div>
                         <div>
-                          <Label className="text-muted-foreground">Kategoria</Label>
-                          <p className="font-medium">{selectedPayment.category}</p>
+                          <Label className="text-muted-foreground">
+                            Kategoria
+                          </Label>
+                          <p className="font-medium">
+                            {selectedPayment.category}
+                          </p>
                         </div>
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">Następna płatność</Label>
-                        <p className="font-medium">{selectedPayment.nextPayment}</p>
+                        <Label className="text-muted-foreground">
+                          Następna płatność
+                        </Label>
+                        <p className="font-medium">
+                          {selectedPayment.nextPayment}
+                        </p>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Następna płatność: {calculateNextPaymentDate(selectedPayment.nextPayment, selectedPayment.frequency)}
+                        Następna płatność:{" "}
+                        {calculateNextPaymentDate(
+                          selectedPayment.nextPayment,
+                          selectedPayment.frequency,
+                        )}
                       </p>
                       {selectedPayment.pdfUrl && (
                         <div>
-                          <Label className="text-muted-foreground">Dokument PDF</Label>
+                          <Label className="text-muted-foreground">
+                            Dokument PDF
+                          </Label>
                           <div className="flex items-center gap-2 mt-1">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => openPdfModal(selectedPayment.pdfUrl!)}
+                              onClick={() =>
+                                openPdfModal(selectedPayment.pdfUrl!)
+                              }
                               className="w-full"
                             >
                               <FileText className="h-4 w-4 mr-2" />
@@ -2813,8 +3465,14 @@ const addToHistory = useCallback(
                       )}
                       <Separator />
                       <div>
-                        <Label className="text-muted-foreground">Data utworzenia</Label>
-                        <p className="font-medium">{new Date(selectedPayment.createdAt).toLocaleDateString('pl-PL')}</p>
+                        <Label className="text-muted-foreground">
+                          Data utworzenia
+                        </Label>
+                        <p className="font-medium">
+                          {new Date(
+                            selectedPayment.createdAt,
+                          ).toLocaleDateString("pl-PL")}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -2822,7 +3480,12 @@ const addToHistory = useCallback(
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => handleEdit(selectedPayment as RecurringPayment, "recurring")}
+                    onClick={() =>
+                      handleEdit(
+                        selectedPayment as RecurringPayment,
+                        "recurring",
+                      )
+                    }
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edytuj
@@ -2843,7 +3506,10 @@ const addToHistory = useCallback(
           </TabsContent>
 
           {/* Historia */}
-          <TabsContent value="history" className="space-y-6 animate-in fade-in-50 duration-500">
+          <TabsContent
+            value="history"
+            className="space-y-6 animate-in fade-in-50 duration-500"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Historia zmian</h2>
               <Select value={historyFilter} onValueChange={setHistoryFilter}>
@@ -2855,7 +3521,9 @@ const addToHistory = useCallback(
                   <SelectItem value="Faktura">Faktury</SelectItem>
                   <SelectItem value="Wydatek">Wydatki</SelectItem>
                   <SelectItem value="Oferta">Oferty</SelectItem>
-                  <SelectItem value="Płatność cykliczna">Płatności cykliczne</SelectItem>
+                  <SelectItem value="Płatność cykliczna">
+                    Płatności cykliczne
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2863,7 +3531,9 @@ const addToHistory = useCallback(
             <Card>
               <CardHeader>
                 <CardTitle>Log aktywności</CardTitle>
-                <CardDescription>Wszystkie zmiany w systemie z możliwością cofnięcia</CardDescription>
+                <CardDescription>
+                  Wszystkie zmiany w systemie z możliwością cofnięcia
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isHistoryLoading ? (
@@ -2871,29 +3541,47 @@ const addToHistory = useCallback(
                 ) : (
                   <div className="space-y-4">
                     {historyEntries
-                      .filter((item) => historyFilter === "all" || item.type === historyFilter)
+                      .filter(
+                        (item) =>
+                          historyFilter === "all" ||
+                          item.type === historyFilter,
+                      )
                       .map((item, index) => (
                         <div key={item.id}>
                           <div className="flex items-start justify-between">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">{item.timestamp}</span>
+                                <span className="font-medium">
+                                  {item.timestamp}
+                                </span>
                                 <span className="text-muted-foreground">•</span>
                                 <span>{item.user.name}</span>
                               </div>
                               <div className="mt-1">
-                                <span className="text-muted-foreground">{item.description}</span>
+                                <span className="text-muted-foreground">
+                                  {item.description}
+                                </span>
                               </div>
                               {item.changes && (
                                 <div className="mt-2 text-xs">
                                   {item.changes.before && (
                                     <div className="text-red-600">
-                                      Przed: {JSON.stringify(item.changes.before, null, 2)}
+                                      Przed:{" "}
+                                      {JSON.stringify(
+                                        item.changes.before,
+                                        null,
+                                        2,
+                                      )}
                                     </div>
                                   )}
                                   {item.changes.after && (
                                     <div className="text-green-600">
-                                      Po: {JSON.stringify(item.changes.after, null, 2)}
+                                      Po:{" "}
+                                      {JSON.stringify(
+                                        item.changes.after,
+                                        null,
+                                        2,
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -2913,12 +3601,15 @@ const addToHistory = useCallback(
                               )}
                             </div>
                           </div>
-                          {index < historyEntries.length - 1 && <Separator className="my-4" />}
+                          {index < historyEntries.length - 1 && (
+                            <Separator className="my-4" />
+                          )}
                         </div>
                       ))}
                     {!isHistoryLoading && historyEntries.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
-                        Brak zmian w historii. Rozpocznij pracę, aby zobaczyć log aktywności.
+                        Brak zmian w historii. Rozpocznij pracę, aby zobaczyć
+                        log aktywności.
                       </div>
                     )}
                   </div>
@@ -2934,17 +3625,27 @@ const addToHistory = useCallback(
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Profil użytkownika</DialogTitle>
-            <DialogDescription>Zarządzaj swoim profilem i ustawieniami konta</DialogDescription>
+            <DialogDescription>
+              Zarządzaj swoim profilem i ustawieniami konta
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex items-center gap-4">
               <Image
                 className="h-16 w-16 rounded-full object-cover border-2 border-border"
                 src={user?.imageUrl || "/placeholder.svg?height=64&width=64"}
-                alt={user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
+                alt={
+                  user?.firstName
+                    ? `${user.firstName} ${user.lastName}`
+                    : "User"
+                }
               />
               <div>
-                <h3 className="font-medium">{user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}</h3>
+                <h3 className="font-medium">
+                  {user?.firstName
+                    ? `${user.firstName} ${user.lastName}`
+                    : "User"}
+                </h3>
                 <p className="text-sm text-muted-foreground">Administrator</p>
               </div>
             </div>
@@ -2990,15 +3691,30 @@ const addToHistory = useCallback(
             <Separator />
             <div className="grid gap-2">
               <Label>Email</Label>
-              <Input value={user?.primaryEmailAddress?.emailAddress || ""} disabled />
+              <Input
+                value={user?.primaryEmailAddress?.emailAddress || ""}
+                disabled
+              />
             </div>
             <div className="grid gap-2">
               <Label>Imię i nazwisko</Label>
-              <Input value={user?.firstName ? `${user.firstName} ${user.lastName}` : ""} disabled />
+              <Input
+                value={
+                  user?.firstName ? `${user.firstName} ${user.lastName}` : ""
+                }
+                disabled
+              />
             </div>
             <div className="grid gap-2">
               <Label>Data utworzenia konta</Label>
-              <Input value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString("pl-PL") : ""} disabled />
+              <Input
+                value={
+                  user?.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString("pl-PL")
+                    : ""
+                }
+                disabled
+              />
             </div>
           </div>
           <DialogFooter>
@@ -3014,49 +3730,69 @@ const addToHistory = useCallback(
           className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
           onClick={() => setIsPdfModalOpen(false)}
         >
-          <div className="bg-card w-4/5 h-4/5 rounded-lg shadow-lg flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-card w-4/5 h-4/5 rounded-lg shadow-lg flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-medium">Podgląd dokumentu</h3>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <a href={currentPdfUrl} download target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={currentPdfUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <Download className="h-4 w-4 mr-1" />
                     Pobierz
                   </a>
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setIsPdfModalOpen(false)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPdfModalOpen(false)}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             <div className="flex-1 p-4 overflow-auto">
-              <iframe src={currentPdfUrl} className="w-full h-full border-0" title="PDF Viewer" />
+              <iframe
+                src={currentPdfUrl}
+                className="w-full h-full border-0"
+                title="PDF Viewer"
+              />
             </div>
           </div>
         </div>
       )}
 
       {/* Add this before the final closing tag */}
-      <Dialog open={reminderConfirmation.isOpen} onOpenChange={(isOpen) =>
-        setReminderConfirmation(prev => ({ ...prev, isOpen }))
-      }>
+      <Dialog
+        open={reminderConfirmation.isOpen}
+        onOpenChange={(isOpen) =>
+          setReminderConfirmation((prev) => ({ ...prev, isOpen }))
+        }
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Potwierdź wysłanie przypomnienia</DialogTitle>
             <DialogDescription>
-              Czy na pewno chcesz wysłać przypomnienie o płatności do {reminderConfirmation.invoice?.representativeEmail}?
+              Czy na pewno chcesz wysłać przypomnienie o płatności do{" "}
+              {reminderConfirmation.invoice?.representativeEmail}?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setReminderConfirmation({ isOpen: false, invoice: null })}
+              onClick={() =>
+                setReminderConfirmation({ isOpen: false, invoice: null })
+              }
             >
               Anuluj
             </Button>
-            <Button
-              onClick={handleConfirmedReminder}
-            >
+            <Button onClick={handleConfirmedReminder}>
               Wyślij przypomnienie
             </Button>
           </DialogFooter>
@@ -3064,5 +3800,5 @@ const addToHistory = useCallback(
       </Dialog>
       <Toaster />
     </div>
-  )
+  );
 }
